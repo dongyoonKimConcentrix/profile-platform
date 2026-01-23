@@ -1,0 +1,11 @@
+# n8n 데이터
+.n8n/
+credentials/
+workflows/*.json.bak
+
+# 로그
+*.log
+
+# 환경 변수
+.env
+.env.local

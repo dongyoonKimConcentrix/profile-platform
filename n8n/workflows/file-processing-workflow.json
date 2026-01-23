@@ -1,0 +1,373 @@
+{
+  "name": "File Processing to Supabase",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "file-upload",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "webhook-file-upload",
+      "name": "Webhook - File Upload",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 300],
+      "webhookId": "file-upload-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "file-name",
+              "name": "fileName",
+              "value": "={{ $json.headers?.['content-disposition'] ? $json.headers['content-disposition'].match(/filename=\"?([^\"]+)\"?/)?.[1] : $json.headers?.['x-filename'] || $binary?.data?.fileName || 'unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "file-type",
+              "name": "fileType",
+              "value": "={{ $json.headers?.['content-type'] || $binary?.data?.mimeType || 'application/octet-stream' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-file-info",
+      "name": "Set File Info",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "pdf-condition",
+              "leftValue": "={{ $json.fileType }}",
+              "rightValue": "application/pdf",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "word-condition",
+              "leftValue": "={{ $json.fileType }}",
+              "rightValue": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "ppt-condition",
+              "leftValue": "={{ $json.fileType }}",
+              "rightValue": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "check-file-type",
+      "name": "Check File Type",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FILE_PARSING_SERVICE_URL || 'http://localhost:3000/parse' }}",
+        "authentication": "none",
+        "sendBody": true,
+        "specifyBody": "formData",
+        "formDataParameters": {
+          "parameters": [
+            {
+              "name": "file",
+              "value": "={{ $binary.data }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "extract-text",
+      "name": "Extract Text from File (HTTP)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "notes": "외부 파싱 서비스 호출. FILE_PARSING_SERVICE_URL 환경 변수 설정 필요. 바이너리 데이터는 자동으로 전송됩니다."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "extracted-text",
+              "name": "extractedText",
+              "value": "={{ $json.text || $json.data || $json.content || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "original-file-name",
+              "name": "originalFileName",
+              "value": "={{ $('Set File Info').item.json.fileName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "merge-extracted-text",
+      "name": "Merge Extracted Text",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "operation": "create",
+        "modelId": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2000
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an expert at extracting structured information from resumes and CVs. Extract the following information in JSON format:\n{\n  \"name\": \"person name\",\n  \"email\": \"email address\",\n  \"phone\": \"phone number\",\n  \"position\": \"frontend|backend|fullstack|mobile|data|devops\",\n  \"experience\": \"junior|mid|senior|expert\",\n  \"domain\": [\"finance\", \"ecommerce\", \"healthcare\", \"education\", \"manufacturing\", \"logistics\"],\n  \"skills\": [\"skill1\", \"skill2\", ...],\n  \"description\": \"summary text\"\n}\n\nOnly return valid JSON, no additional text."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.extractedText }}"
+            }
+          ]
+        }
+      },
+      "id": "ai-analysis",
+      "name": "AI Analysis - Extract Data",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1250, 300],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "embeddings",
+        "operation": "create",
+        "modelId": "text-embedding-3-small",
+        "text": "={{ $json.extractedText }}"
+      },
+      "id": "generate-embedding",
+      "name": "Generate Embedding",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [1250, 450],
+      "credentials": {
+        "openAiApi": {
+          "id": "openai-credentials",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and prepare data for Supabase\nconst aiResponse = $input.item.json.message?.content?.text || $input.item.json.choices?.[0]?.message?.content || '{}';\nlet parsedData;\n\ntry {\n  // Remove markdown code blocks if present\n  const cleanedResponse = aiResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsedData = JSON.parse(cleanedResponse);\n} catch (error) {\n  throw new Error(`Failed to parse AI response: ${error.message}`);\n}\n\n// Get embedding from the embedding node\nconst embedding = $('Generate Embedding').item.json.data?.[0]?.embedding || [];\n\n// Prepare data for Supabase\nconst profileData = {\n  name: parsedData.name || '',\n  email: parsedData.email || '',\n  phone: parsedData.phone || null,\n  position: parsedData.position || 'frontend',\n  experience: parsedData.experience || 'junior',\n  domain: Array.isArray(parsedData.domain) ? parsedData.domain : (parsedData.domain ? [parsedData.domain] : null),\n  skills: Array.isArray(parsedData.skills) ? parsedData.skills : [],\n  description: parsedData.description || null,\n  match_score: 0,\n  embedding: embedding.length > 0 ? `[${embedding.join(',')}]` : null\n};\n\nreturn {\n  json: profileData\n};"
+      },
+      "id": "prepare-supabase-data",
+      "name": "Prepare Supabase Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "tableId": "profiles",
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {}
+        },
+        "options": {}
+      },
+      "id": "save-to-supabase",
+      "name": "Save to Supabase",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1650, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "supabase-credentials",
+          "name": "Supabase API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, message: 'Profile created successfully', id: $json.id } }}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1850, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: false, error: $json.error || 'Unknown error' } }}",
+        "responseCode": 400
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1050, 500]
+    }
+  ],
+  "connections": {
+    "Webhook - File Upload": {
+      "main": [
+        [
+          {
+            "node": "Set File Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set File Info": {
+      "main": [
+        [
+          {
+            "node": "Check File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check File Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text from File": {
+      "main": [
+        [
+          {
+            "node": "Merge Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Extracted Text": {
+      "main": [
+        [
+          {
+            "node": "AI Analysis - Extract Data",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Generate Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Analysis - Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Supabase Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Embedding": {
+      "main": [
+        [
+          {
+            "node": "Prepare Supabase Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Supabase Data": {
+      "main": [
+        [
+          {
+            "node": "Save to Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Supabase": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 1,
+  "updatedAt": "2024-01-01T00:00:00.000Z",
+  "versionId": "1"
+}

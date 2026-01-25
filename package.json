@@ -29,6 +29,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.3",
     "@supabase/mcp-server-supabase": "^0.6.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

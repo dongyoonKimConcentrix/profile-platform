@@ -10,38 +10,38 @@
           "rawBody": true
         }
       },
-      "id": "webhook-file-upload",
+      "id": "6043fa61-aaf2-4485-9e33-13678141e32a",
       "name": "Webhook - File Upload",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 300],
+      "position": [
+        3744,
+        1760
+      ],
       "webhookId": "file-upload-webhook"
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
+        "fields": {
+          "values": [
             {
-              "id": "file-name",
-              "name": "fileName",
-              "value": "={{ $json.headers?.['content-disposition'] ? $json.headers['content-disposition'].match(/filename=\"?([^\"]+)\"?/)?.[1] : $json.headers?.['x-filename'] || $binary?.data?.fileName || 'unknown' }}",
-              "type": "string"
-            },
-            {
-              "id": "file-type",
               "name": "fileType",
-              "value": "={{ $json.headers?.['content-type'] || $binary?.data?.mimeType || 'application/octet-stream' }}",
-              "type": "string"
+              "stringValue": "={{ $binary.file.mimeType }}"
             }
           ]
         },
-        "options": {}
+        "options": {
+          "includeBinary": true
+        }
       },
-      "id": "set-file-info",
+      "id": "192dd754-5ed4-44ad-b66e-4b2c5ad81144",
       "name": "Set File Info",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.2,
-      "position": [450, 300]
+      "position": [
+        3952,
+        1760
+      ]
     },
     {
       "parameters": {
@@ -49,12 +49,13 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "strict",
+            "version": 1
           },
           "conditions": [
             {
               "id": "pdf-condition",
-              "leftValue": "={{ $json.fileType }}",
+              "leftValue": "={{ $binary.file.mimeType }}",
               "rightValue": "application/pdf",
               "operator": {
                 "type": "string",
@@ -63,7 +64,7 @@
             },
             {
               "id": "word-condition",
-              "leftValue": "={{ $json.fileType }}",
+              "leftValue": "={{ $binary.file.mimeType }}",
               "rightValue": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
               "operator": {
                 "type": "string",
@@ -72,8 +73,17 @@
             },
             {
               "id": "ppt-condition",
-              "leftValue": "={{ $json.fileType }}",
+              "leftValue": "={{ $binary.file.mimeType }}",
               "rightValue": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            },
+            {
+              "id": "6ca1d5cd-8723-4843-b1e0-d2f402ed0d7d",
+              "leftValue": "={{ $binary.file.mimeType }}",
+              "rightValue": "text/plain",
               "operator": {
                 "type": "string",
                 "operation": "contains"
@@ -84,24 +94,27 @@
         },
         "options": {}
       },
-      "id": "check-file-type",
+      "id": "9ca9eb71-9ed1-46a0-b613-2d72ac38114e",
       "name": "Check File Type",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [650, 300]
+      "position": [
+        4144,
+        1760
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.FILE_PARSING_SERVICE_URL || 'http://localhost:3000/parse' }}",
-        "authentication": "none",
+        "url": "http://localhost:3000/parse",
         "sendBody": true,
-        "specifyBody": "formData",
-        "formDataParameters": {
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
           "parameters": [
             {
+              "parameterType": "formBinaryData",
               "name": "file",
-              "value": "={{ $binary.data }}"
+              "inputDataFieldName": "file"
             }
           ]
         },
@@ -113,148 +126,203 @@
           }
         }
       },
-      "id": "extract-text",
+      "id": "2fc61e3d-b787-4655-93b5-35a8b0bfeebe",
       "name": "Extract Text from File (HTTP)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [850, 300],
+      "position": [
+        4352,
+        1760
+      ],
       "notes": "외부 파싱 서비스 호출. FILE_PARSING_SERVICE_URL 환경 변수 설정 필요. 바이너리 데이터는 자동으로 전송됩니다."
     },
     {
       "parameters": {
-        "assignments": {
-          "assignments": [
-            {
-              "id": "extracted-text",
-              "name": "extractedText",
-              "value": "={{ $json.text || $json.data || $json.content || '' }}",
-              "type": "string"
-            },
-            {
-              "id": "original-file-name",
-              "name": "originalFileName",
-              "value": "={{ $('Set File Info').item.json.fileName }}",
-              "type": "string"
-            }
-          ]
-        },
         "options": {}
       },
-      "id": "merge-extracted-text",
+      "id": "ea939bc5-3bed-44ea-8b59-507b08d04203",
       "name": "Merge Extracted Text",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.2,
-      "position": [1050, 300]
+      "position": [
+        4544,
+        1760
+      ]
     },
     {
       "parameters": {
         "resource": "chat",
-        "operation": "create",
-        "modelId": "gpt-4o-mini",
-        "options": {
-          "temperature": 0.3,
-          "maxTokens": 2000
-        },
-        "messages": {
-          "values": [
+        "model": "gpt-4o-mini",
+        "prompt": {
+          "messages": [
             {
               "role": "system",
-              "content": "You are an expert at extracting structured information from resumes and CVs. Extract the following information in JSON format:\n{\n  \"name\": \"person name\",\n  \"email\": \"email address\",\n  \"phone\": \"phone number\",\n  \"position\": \"frontend|backend|fullstack|mobile|data|devops\",\n  \"experience\": \"junior|mid|senior|expert\",\n  \"domain\": [\"finance\", \"ecommerce\", \"healthcare\", \"education\", \"manufacturing\", \"logistics\"],\n  \"skills\": [\"skill1\", \"skill2\", ...],\n  \"description\": \"summary text\"\n}\n\nOnly return valid JSON, no additional text."
+              "content": "You are a professional HR data analyst. Extract structured information from the provided resume text according to the following rules:  1. **Information to Extract (JSON Format)**:    - \"name\": Name of the person.    - \"gender\": \"남성\" or \"여성\".    - \"birthdate\": \"YYYY-MM-DD\" format.    - \"email\": Email address.    - \"phone\": Phone number.    - \"total_experience\": Total years/months of career (e.g., \"10년 5개월\").    - \"age\": Calculate age based on \"2026-01-24\" (Today). If birthdate is 1988-01-31, age should be 37.    - \"education\": One of [\"고졸\", \"전문학사\", \"학사\", \"석사\", \"박사\"].    - \"industries\": List of experienced industries (e.g., [\"금융\", \"이커머스\"]).    - \"career_details\": List of objects containing:      - \"period\": \"YYYY.MM ~ YYYY.MM\"      - \"industry\": Industry classification for this period.      - \"duration\": Calculated duration in months (e.g., \"금융 8개월\").    - \"skills\": List of technical skills (e.g., [\"React\", \"Node.js\", \"TypeScript\", \"Supabase\"]).    - \"photo_exists\": Boolean (true if a photo is present or mentioned, otherwise false).  2. **Calculation Logic**:    - For \"age\": Use the current date (2026-01-24) and the birthdate to calculate the Korean age or international age as requested.    - For \"career_details\": Analyze each project or workplace, identify the industry, and calculate the exact number of months for each.  3. **Output Rule**:    - Return ONLY valid JSON.    - Language: Korean (except for technical skills)."
+            }
+          ]
+        },
+        "options": {},
+        "requestOptions": {}
+      },
+      "id": "f0c7ab9c-498d-43ee-b4bf-a474afb49e28",
+      "name": "AI Analysis - Extract Data",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [
+        4752,
+        1760
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "IPQ1NweLAtXS2Nki",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. 입력 데이터 가져오기\nconst allData = $input.all();\n\n// 첫 번째 입력이 AI Analysis, 두 번째가 HTTP Request입니다.\nconst aiJson = allData[0]?.json || {};\nconst embedJson = allData[1]?.json || {};\n\n// 2. AI 응답 텍스트 추출 및 파싱\nlet aiText = aiJson.choices?.[0]?.message?.content || aiJson.text || aiJson.message?.content || \"\";\nif (typeof aiText === 'object') aiText = aiText.text || \"\";\n\nlet parsed = {};\ntry {\n  // 마크다운 기호 제거 후 JSON 파싱\n  const cleanJson = aiText.replace(//g, \"\").replace(/```/g, \"\").trim();\n  parsed = cleanJson ? JSON.parse(cleanJson) : {};\n} catch (e) {\n  console.error(\"JSON 파싱 실패\");\n}\n\n// 3. 임베딩 벡터 데이터 처리\nlet vectorString = null;\nif (embedJson.data && embedJson.data[0] && embedJson.data[0].embedding) {\n  const arr = embedJson.data[0].embedding;\n  vectorString = \"[\" + arr.join(\",\") + \"]\";\n}\n\n// 4. 최종 결과 반환\nreturn {\n  json: {\n    ...parsed,\n    embedding: vectorString,\n    match_score: 0\n  }\n};"
+      },
+      "id": "6a703035-e435-44df-8674-fcdec367ed9a",
+      "name": "Prepare Supabase Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        4944,
+        1760
+      ]
+    },
+    {
+      "parameters": {
+        "tableId": "profiles",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "=={{ $json.name }}"
             },
             {
-              "role": "user",
-              "content": "={{ $json.extractedText }}"
+              "fieldId": "email",
+              "fieldValue": "=={{ $json.email }}"
+            },
+            {
+              "fieldId": "phone",
+              "fieldValue": "=={{ $json.phone }}"
+            },
+            {
+              "fieldId": "position",
+              "fieldValue": "=={{ $json.position }}"
+            },
+            {
+              "fieldId": "experience",
+              "fieldValue": "=={{ $json.experience }}"
+            },
+            {
+              "fieldId": "domain",
+              "fieldValue": "=={{ $json.domain }}"
+            },
+            {
+              "fieldId": "skills",
+              "fieldValue": "=={{ $json.skills }}"
+            },
+            {
+              "fieldId": "description",
+              "fieldValue": "=={{ $json.description }}"
+            },
+            {
+              "fieldId": "embedding",
+              "fieldValue": "=={{ $json.embedding }}"
             }
           ]
         }
       },
-      "id": "ai-analysis",
-      "name": "AI Analysis - Extract Data",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 1,
-      "position": [1250, 300],
-      "credentials": {
-        "openAiApi": {
-          "id": "openai-credentials",
-          "name": "OpenAI API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "resource": "embeddings",
-        "operation": "create",
-        "modelId": "text-embedding-3-small",
-        "text": "={{ $json.extractedText }}"
-      },
-      "id": "generate-embedding",
-      "name": "Generate Embedding",
-      "type": "n8n-nodes-base.openAi",
-      "typeVersion": 1,
-      "position": [1250, 450],
-      "credentials": {
-        "openAiApi": {
-          "id": "openai-credentials",
-          "name": "OpenAI API"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "// Parse AI response and prepare data for Supabase\nconst aiResponse = $input.item.json.message?.content?.text || $input.item.json.choices?.[0]?.message?.content || '{}';\nlet parsedData;\n\ntry {\n  // Remove markdown code blocks if present\n  const cleanedResponse = aiResponse.replace(/```json\\n?/g, '').replace(/```\\n?/g, '').trim();\n  parsedData = JSON.parse(cleanedResponse);\n} catch (error) {\n  throw new Error(`Failed to parse AI response: ${error.message}`);\n}\n\n// Get embedding from the embedding node\nconst embedding = $('Generate Embedding').item.json.data?.[0]?.embedding || [];\n\n// Prepare data for Supabase\nconst profileData = {\n  name: parsedData.name || '',\n  email: parsedData.email || '',\n  phone: parsedData.phone || null,\n  position: parsedData.position || 'frontend',\n  experience: parsedData.experience || 'junior',\n  domain: Array.isArray(parsedData.domain) ? parsedData.domain : (parsedData.domain ? [parsedData.domain] : null),\n  skills: Array.isArray(parsedData.skills) ? parsedData.skills : [],\n  description: parsedData.description || null,\n  match_score: 0,\n  embedding: embedding.length > 0 ? `[${embedding.join(',')}]` : null\n};\n\nreturn {\n  json: profileData\n};"
-      },
-      "id": "prepare-supabase-data",
-      "name": "Prepare Supabase Data",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1450, 300]
-    },
-    {
-      "parameters": {
-        "operation": "create",
-        "tableId": "profiles",
-        "columns": {
-          "mappingMode": "autoMapInputData",
-          "value": {}
-        },
-        "options": {}
-      },
-      "id": "save-to-supabase",
+      "id": "6a04779e-009d-4324-b5c3-66e3edd73e08",
       "name": "Save to Supabase",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
-      "position": [1650, 300],
+      "position": [
+        5152,
+        1760
+      ],
       "credentials": {
         "supabaseApi": {
-          "id": "supabase-credentials",
-          "name": "Supabase API"
+          "id": "NbeQ02PRX58rgfhA",
+          "name": "Supabase account"
         }
       }
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { success: true, message: 'Profile created successfully', id: $json.id } }}"
+        "responseBody": "={{ { success: true, message: 'Profile created successfully', id: $json.id } }}",
+        "options": {}
       },
-      "id": "respond-success",
+      "id": "6adaa227-a215-4e9a-9460-a02386d3b784",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1850, 300]
+      "position": [
+        5344,
+        1760
+      ]
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={{ { success: false, error: $json.error || 'Unknown error' } }}",
-        "responseCode": 400
+        "options": {}
       },
-      "id": "respond-error",
+      "id": "63cfdc5d-c7bd-4234-b82c-79e60c71aabd",
       "name": "Respond Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
-      "position": [1050, 500]
+      "position": [
+        4544,
+        1968
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "text-embedding-3-small"
+            },
+            {
+              "name": "input",
+              "value": "=={{ $json.text }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        4912,
+        2080
+      ],
+      "id": "ec5206b0-55b9-4668-b698-4cfbf72bbf41",
+      "name": "HTTP Request",
+      "credentials": {
+        "openAiApi": {
+          "id": "IPQ1NweLAtXS2Nki",
+          "name": "OpenAi account"
+        },
+        "httpHeaderAuth": {
+          "id": "4XyTn8H5Tzt8StjQ",
+          "name": "Header Auth account"
+        }
+      }
     }
   ],
+  "pinData": {},
   "connections": {
     "Webhook - File Upload": {
       "main": [
@@ -278,28 +346,6 @@
         ]
       ]
     },
-    "Check File Type": {
-      "main": [
-        [
-          {
-            "node": "Extract Text from File",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Extract Text from File": {
-      "main": [
-        [
-          {
-            "node": "Merge Extracted Text",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Merge Extracted Text": {
       "main": [
         [
@@ -309,7 +355,7 @@
             "index": 0
           },
           {
-            "node": "Generate Embedding",
+            "node": "HTTP Request",
             "type": "main",
             "index": 0
           }
@@ -317,17 +363,6 @@
       ]
     },
     "AI Analysis - Extract Data": {
-      "main": [
-        [
-          {
-            "node": "Prepare Supabase Data",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Generate Embedding": {
       "main": [
         [
           {
@@ -359,15 +394,58 @@
           }
         ]
       ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Prepare Supabase Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check File Type": {
+      "main": [
+        [
+          {
+            "node": "Extract Text from File (HTTP)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Text from File (HTTP)": {
+      "main": [
+        [
+          {
+            "node": "Merge Extracted Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
-  "pinData": {},
+  "active": false,
   "settings": {
-    "executionOrder": "v1"
+    "executionOrder": "v1",
+    "availableInMCP": false
   },
-  "staticData": null,
-  "tags": [],
-  "triggerCount": 1,
-  "updatedAt": "2024-01-01T00:00:00.000Z",
-  "versionId": "1"
+  "versionId": "6f3ba9b1-1bfe-4416-816d-2e7d1edc5d24",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a9e03486adb0f3509c6deef16b2a8faec12283789a98c01ce9c9fd09fe64fb97"
+  },
+  "id": "4wjb2MIzVaA4-pBjLRsl0",
+  "tags": []
 }

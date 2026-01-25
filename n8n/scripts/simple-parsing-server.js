@@ -77,10 +77,14 @@ app.post('/parse', upload.single('file'), async (req, res) => {
       // 실제 구현 시 officegen 또는 다른 라이브러리 필요
       text = `[PPT 파일: ${fileName}]\nPPT 파일 파싱은 현재 지원되지 않습니다. PDF나 Word 형식으로 변환해주세요.`;
     }
+    // 텍스트 파일 파싱 (.txt)
+    else if (fileType === 'text/plain') {
+      text = fs.readFileSync(filePath, 'utf8');
+    }
     else {
       return res.status(400).json({ 
         error: `Unsupported file type: ${fileType}`,
-        supportedTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']
+        supportedTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'text/plain']
       });
     }
 

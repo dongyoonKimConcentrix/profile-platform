@@ -1,8 +1,21 @@
+"use client";
+
+import { useState } from "react";
 import { MainLayout } from "@/components/layout/main-layout";
 import { SearchInterface } from "@/components/search/search-interface";
 import { SearchResults } from "@/components/search/search-results";
 
 export default function SearchPage() {
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSearchResults = (results: any[], loading: boolean, err: string | null) => {
+    setSearchResults(results);
+    setIsLoading(loading);
+    setError(err);
+  };
+
   return (
     <MainLayout>
       <div className="space-y-8">
@@ -13,9 +26,9 @@ export default function SearchPage() {
           </p>
         </div>
 
-        <SearchInterface />
+        <SearchInterface onSearchResults={handleSearchResults} />
 
-        <SearchResults />
+        <SearchResults results={searchResults} loading={isLoading} error={error} />
       </div>
     </MainLayout>
   );

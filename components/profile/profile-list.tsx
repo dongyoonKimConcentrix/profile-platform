@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 
-interface Profile {
+export interface Profile {
   id: string;
   name: string;
   email: string;
@@ -19,6 +19,11 @@ interface Profile {
   domain: string | string[] | null;
   skills: string[];
   match_score: number;
+}
+
+interface ProfileListProps {
+  /** 서버에서 조회한 프로필 목록. 전달 시 클라이언트에서 별도 조회하지 않음 (RLS 우회용) */
+  initialProfiles?: Profile[];
 }
 
 const positionLabels: Record<string, string> = {
@@ -72,13 +77,17 @@ const getDomainBgClass = (domain: string | null): string => {
   return bgMap[domain] || "bg-slate-100";
 };
 
-export function ProfileList() {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
+export function ProfileList({ initialProfiles }: ProfileListProps = {}) {
+  const [profiles, setProfiles] = useState<Profile[]>(initialProfiles ?? []);
+  const [loading, setLoading] = useState(initialProfiles === undefined);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearchQuery, setActiveSearchQuery] = useState("");
 
   useEffect(() => {
+    if (initialProfiles !== undefined) {
+      setLoading(false);
+      return;
+    }
     const fetchProfiles = async () => {
       try {
         const supabase = createClient();
@@ -89,7 +98,6 @@ export function ProfileList() {
 
         if (error) {
           console.error("Error fetching profiles:", error);
-          // RLS 정책 오류인 경우를 위한 처리
           if (error.message.includes("row-level security") || error.code === "42501") {
             console.warn("RLS 정책 때문에 데이터를 조회할 수 없습니다. 인증이 필요할 수 있습니다.");
           }
@@ -108,7 +116,7 @@ export function ProfileList() {
     };
 
     fetchProfiles();
-  }, []);
+  }, [initialProfiles]);
 
   const handleSearch = () => {
     setActiveSearchQuery(searchQuery);

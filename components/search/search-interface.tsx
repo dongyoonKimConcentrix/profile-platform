@@ -8,10 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Search, Sparkles, Filter } from "lucide-react";
+import { Search, Sparkles, Filter, Loader2 } from "lucide-react";
 import { AdvancedFilters } from "./advanced-filters";
 
-export function SearchInterface() {
+interface SearchInterfaceProps {
+  onSearchResults: (results: any[], loading: boolean, error: string | null) => void;
+}
+
+export function SearchInterface({ onSearchResults }: SearchInterfaceProps) {
   const [searchMode, setSearchMode] = useState<"natural" | "filter">("natural");
   const [naturalQuery, setNaturalQuery] = useState("");
   const [filters, setFilters] = useState({
@@ -20,10 +24,64 @@ export function SearchInterface() {
     experience: "",
     domain: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSearch = () => {
-    // 검색 로직 (나중에 Supabase 연동 시 구현)
-    console.log("Search:", searchMode === "natural" ? naturalQuery : filters);
+  const handleSearch = async () => {
+    setIsLoading(true);
+    onSearchResults([], true, null);
+
+    try {
+      if (searchMode === "natural") {
+        // 자연어 검색
+        if (!naturalQuery.trim()) {
+          onSearchResults([], false, "검색어를 입력해주세요.");
+          setIsLoading(false);
+          return;
+        }
+
+        const response = await fetch("/api/search/natural", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ query: naturalQuery }),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "검색에 실패했습니다.");
+        }
+
+        const data = await response.json();
+        onSearchResults(data.results || [], false, null);
+      } else {
+        // 필터 검색
+        const response = await fetch("/api/search/filter", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(filters),
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.error || "검색에 실패했습니다.");
+        }
+
+        const data = await response.json();
+        onSearchResults(data.results || [], false, null);
+      }
+    } catch (error) {
+      console.error("검색 에러:", error);
+      onSearchResults(
+        [],
+        false,
+        error instanceof Error ? error.message : "검색 중 오류가 발생했습니다."
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -58,6 +116,12 @@ export function SearchInterface() {
                 placeholder="예: 금융권 프로젝트 경험이 있는 React 개발자"
                 value={naturalQuery}
                 onChange={(e) => setNaturalQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+                    e.preventDefault();
+                    handleSearch();
+                  }
+                }}
                 rows={3}
                 className="resize-none"
                 aria-describedby="natural-query-help"
@@ -69,9 +133,22 @@ export function SearchInterface() {
                 AI가 자연어로 입력한 요구사항을 분석하여 최적의 인력을 추천합니다.
               </p>
             </div>
-            <Button onClick={handleSearch} className="w-full sm:w-auto">
-              <Search className="h-4 w-4 mr-2" aria-hidden="true" />
-              검색하기
+            <Button 
+              onClick={handleSearch} 
+              className="w-full sm:w-auto"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden="true" />
+                  검색 중...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" aria-hidden="true" />
+                  검색하기
+                </>
+              )}
             </Button>
           </TabsContent>
 

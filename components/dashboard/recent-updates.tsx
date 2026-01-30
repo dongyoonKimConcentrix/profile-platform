@@ -6,43 +6,42 @@ import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import Link from "next/link";
 
-// 임시 데이터 (나중에 Supabase에서 가져올 예정)
-const recentProfiles = [
-  {
-    id: "1",
-    name: "김**",
-    position: "프론트엔드 개발자",
-    skills: ["React", "TypeScript", "Next.js"],
-    updatedAt: "2시간 전",
-    matchScore: 92,
-  },
-  {
-    id: "2",
-    name: "이**",
-    position: "백엔드 개발자",
-    skills: ["Node.js", "Python", "PostgreSQL"],
-    updatedAt: "5시간 전",
-    matchScore: 88,
-  },
-  {
-    id: "3",
-    name: "박**",
-    position: "풀스택 개발자",
-    skills: ["React", "Node.js", "MongoDB"],
-    updatedAt: "1일 전",
-    matchScore: 85,
-  },
-  {
-    id: "4",
-    name: "최**",
-    position: "데이터 엔지니어",
-    skills: ["Python", "Spark", "Airflow"],
-    updatedAt: "2일 전",
-    matchScore: 90,
-  },
-];
+const positionLabels: Record<string, string> = {
+  frontend: "프론트엔드 개발자",
+  backend: "백엔드 개발자",
+  fullstack: "풀스택 개발자",
+  mobile: "모바일 개발자",
+  data: "데이터 엔지니어",
+  devops: "DevOps 엔지니어",
+};
 
-export function RecentUpdates() {
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+  if (diffMins < 60) return `${diffMins}분 전`;
+  if (diffHours < 24) return `${diffHours}시간 전`;
+  if (diffDays < 7) return `${diffDays}일 전`;
+  return date.toLocaleDateString("ko-KR");
+}
+
+interface RecentProfile {
+  id: string;
+  name: string;
+  position: string;
+  skills: string[];
+  updated_at: string;
+  match_score: number;
+}
+
+interface RecentUpdatesProps {
+  recentProfiles: RecentProfile[];
+}
+
+export function RecentUpdates({ recentProfiles }: RecentUpdatesProps) {
   return (
     <Card>
       <CardHeader>
@@ -53,7 +52,10 @@ export function RecentUpdates() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {recentProfiles.map((profile) => (
+          {recentProfiles.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">최근 업데이트된 프로필이 없습니다.</p>
+          ) : (
+          recentProfiles.map((profile) => (
             <Link
               key={profile.id}
               href={`/profile/${profile.id}`}
@@ -71,10 +73,10 @@ export function RecentUpdates() {
                     <h3 className="font-semibold truncate">{profile.name}</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    {profile.position}
+                    {positionLabels[profile.position] ?? profile.position}
                   </p>
                   <div className="flex flex-wrap gap-1 mb-2">
-                    {profile.skills.map((skill) => (
+                    {(profile.skills ?? []).slice(0, 5).map((skill) => (
                       <Badge
                         key={skill}
                         variant="outline"
@@ -86,12 +88,13 @@ export function RecentUpdates() {
                   </div>
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
                     <Clock className="h-3 w-3" aria-hidden="true" />
-                    <span>{profile.updatedAt}</span>
+                    <span>{formatRelativeTime(profile.updated_at)}</span>
                   </div>
                 </div>
               </div>
             </Link>
-          ))}
+          ))
+          )}
         </div>
       </CardContent>
     </Card>

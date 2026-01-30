@@ -1,10 +1,10 @@
 /**
  * 간단한 파일 파싱 서버
  * PDF, Word, PPT 파일에서 텍스트를 추출합니다.
- * 
+ *
  * 설치:
- * npm install express multer pdf-parse mammoth
- * 
+ * npm install express multer pdf-parse mammoth adm-zip
+ *
  * 실행:
  * node n8n/scripts/simple-parsing-server.js
  */
@@ -13,11 +13,12 @@ const express = require('express');
 const multer = require('multer');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
+const AdmZip = require('adm-zip');
 const fs = require('fs');
 const path = require('path');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3001;
 
 // 임시 파일 저장 디렉토리
 const uploadDir = path.join(__dirname, '../uploads');
@@ -43,6 +44,50 @@ app.use((req, res, next) => {
   next();
 });
 
+// MIME이 비어있거나 application/octet-stream일 때 확장자로 타입 보정 (한글 파일명/n8n 전달 대응)
+function resolveMimeType(mimetype, fileName) {
+  const needsFallback = !mimetype || String(mimetype).trim() === '' || mimetype === 'application/octet-stream';
+  if (!needsFallback) return mimetype;
+  if (!fileName || typeof fileName !== 'string') return mimetype;
+  const ext = fileName.split('.').pop().toLowerCase();
+  const map = {
+    pdf: 'application/pdf',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc: 'application/msword',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    ppt: 'application/vnd.ms-powerpoint',
+    txt: 'text/plain'
+  };
+  return map[ext] || mimetype;
+}
+
+/** PPTX(.pptx)는 ZIP 안의 XML. ppt/slides/slideN.xml에서 <a:t> 텍스트 추출 */
+function extractTextFromPptx(filePath) {
+  const zip = new AdmZip(filePath);
+  const entries = zip.getEntries();
+  const slideEntries = entries
+    .filter((e) => /^ppt\/slides\/slide\d+\.xml$/i.test(e.entryName))
+    .sort((a, b) => {
+      const numA = parseInt(a.entryName.replace(/\D/g, ''), 10) || 0;
+      const numB = parseInt(b.entryName.replace(/\D/g, ''), 10) || 0;
+      return numA - numB;
+    });
+
+  const parts = [];
+  for (const entry of slideEntries) {
+    const xml = entry.getData().toString('utf8');
+    const textMatches = xml.match(/<a:t>([^<]*)<\/a:t>/g);
+    if (textMatches) {
+      const slideText = textMatches
+        .map((m) => m.replace(/<\/?a:t>/g, '').trim())
+        .filter(Boolean)
+        .join(' ');
+      if (slideText) parts.push(slideText);
+    }
+  }
+  return parts.join('\n\n');
+}
+
 app.post('/parse', upload.single('file'), async (req, res) => {
   let filePath = null;
   
@@ -52,11 +97,12 @@ app.post('/parse', upload.single('file'), async (req, res) => {
     }
 
     filePath = req.file.path;
-    const fileType = req.file.mimetype;
-    const fileName = req.file.originalname;
-    let text = '';
+    const fileName = req.file.originalname || '';
+    const fileType = resolveMimeType(req.file.mimetype, fileName);
 
-    console.log(`Parsing file: ${fileName}, Type: ${fileType}`);
+    console.log(`Parsing file: ${fileName}, originalType: ${req.file.mimetype}, resolvedType: ${fileType}`);
+
+    let text = '';
 
     // PDF 파일 파싱
     if (fileType === 'application/pdf') {
@@ -70,12 +116,18 @@ app.post('/parse', upload.single('file'), async (req, res) => {
       const result = await mammoth.extractRawText({ path: filePath });
       text = result.value;
     }
-    // PPT 파일 파싱 (.pptx) - 기본적인 텍스트만 추출
+    // PPT 파일 파싱 (.pptx) - 슬라이드 XML에서 텍스트 추출
     else if (fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
              fileType === 'application/vnd.ms-powerpoint') {
-      // PPT 파싱은 복잡하므로 간단한 메시지 반환
-      // 실제 구현 시 officegen 또는 다른 라이브러리 필요
-      text = `[PPT 파일: ${fileName}]\nPPT 파일 파싱은 현재 지원되지 않습니다. PDF나 Word 형식으로 변환해주세요.`;
+      try {
+        text = extractTextFromPptx(filePath);
+        if (!text || !text.trim()) {
+          text = `[PPT 파일: ${fileName}]\n슬라이드에서 추출된 텍스트가 없습니다.`;
+        }
+      } catch (pptError) {
+        console.error('PPTX parse error:', pptError);
+        text = `[PPT 파일: ${fileName}]\nPPT 파싱 중 오류가 발생했습니다. PDF나 Word 형식으로 변환해 주세요.`;
+      }
     }
     // 텍스트 파일 파싱 (.txt)
     else if (fileType === 'text/plain') {
@@ -84,7 +136,7 @@ app.post('/parse', upload.single('file'), async (req, res) => {
     else {
       return res.status(400).json({ 
         error: `Unsupported file type: ${fileType}`,
-        supportedTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'text/plain']
+        supportedTypes: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint', 'text/plain']
       });
     }
 

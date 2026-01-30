@@ -1,7 +1,17 @@
 import { MainLayout } from "@/components/layout/main-layout";
 import { ProfileList } from "@/components/profile/profile-list";
+import { createClient } from "@/lib/supabase/server";
+import { createServerAdminClient } from "@/lib/supabase/server-admin";
 
-export default function ListPage() {
+export default async function ListPage() {
+  const adminClient = createServerAdminClient();
+  const supabase = adminClient ?? (await createClient());
+
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("*")
+    .order("created_at", { ascending: false });
+
   return (
     <MainLayout>
       <div className="space-y-8">
@@ -12,7 +22,7 @@ export default function ListPage() {
           </p>
         </div>
 
-        <ProfileList />
+        <ProfileList initialProfiles={profiles ?? []} />
       </div>
     </MainLayout>
   );

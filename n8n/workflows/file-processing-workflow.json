@@ -10,13 +10,13 @@
           "rawBody": true
         }
       },
-      "id": "6043fa61-aaf2-4485-9e33-13678141e32a",
+      "id": "10558c12-773c-42ba-8117-c6925496ba9b",
       "name": "Webhook - File Upload",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
       "position": [
-        3744,
-        1760
+        9120,
+        2736
       ],
       "webhookId": "file-upload-webhook"
     },
@@ -34,13 +34,26 @@
           "includeBinary": true
         }
       },
-      "id": "192dd754-5ed4-44ad-b66e-4b2c5ad81144",
+      "id": "4140874e-d255-444b-aefc-d56b6f7c4a9f",
       "name": "Set File Info",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.2,
       "position": [
-        3952,
-        1760
+        9328,
+        2736
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MIME이 비거나 application/octet-stream일 때 파일 확장자로 타입 보정 (한글 파일명/PPTX 대응)\nconst item = $input.item;\nconst binary = item.binary;\nconst json = item.json || {};\nlet mimeType = (binary && binary.file && binary.file.mimeType) ? binary.file.mimeType : (json.fileType || '');\nconst fileName = (binary && binary.file && binary.file.fileName) ? binary.file.fileName : (json.fileName || '');\n\nconst needsFallback = !mimeType || String(mimeType).trim() === '' || mimeType === 'application/octet-stream';\nif (needsFallback && fileName) {\n  const ext = fileName.split('.').pop().toLowerCase();\n  const map = {\n    pdf: 'application/pdf',\n    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',\n    doc: 'application/msword',\n    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',\n    ppt: 'application/vnd.ms-powerpoint',\n    txt: 'text/plain'\n  };\n  if (map[ext]) mimeType = map[ext];\n}\n\nreturn { json: { ...json, resolvedMimeType: mimeType || '' }, binary: binary || {} };"
+      },
+      "id": "a1b2c3d4-resolve-file-type",
+      "name": "Resolve File Type",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        9424,
+        2736
       ]
     },
     {
@@ -55,7 +68,7 @@
           "conditions": [
             {
               "id": "pdf-condition",
-              "leftValue": "={{ $binary.file.mimeType }}",
+              "leftValue": "={{ $json.resolvedMimeType }}",
               "rightValue": "application/pdf",
               "operator": {
                 "type": "string",
@@ -64,7 +77,7 @@
             },
             {
               "id": "word-condition",
-              "leftValue": "={{ $binary.file.mimeType }}",
+              "leftValue": "={{ $json.resolvedMimeType }}",
               "rightValue": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
               "operator": {
                 "type": "string",
@@ -73,7 +86,7 @@
             },
             {
               "id": "ppt-condition",
-              "leftValue": "={{ $binary.file.mimeType }}",
+              "leftValue": "={{ $json.resolvedMimeType }}",
               "rightValue": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
               "operator": {
                 "type": "string",
@@ -82,7 +95,7 @@
             },
             {
               "id": "6ca1d5cd-8723-4843-b1e0-d2f402ed0d7d",
-              "leftValue": "={{ $binary.file.mimeType }}",
+              "leftValue": "={{ $json.resolvedMimeType }}",
               "rightValue": "text/plain",
               "operator": {
                 "type": "string",
@@ -94,19 +107,19 @@
         },
         "options": {}
       },
-      "id": "9ca9eb71-9ed1-46a0-b613-2d72ac38114e",
+      "id": "276f6d6f-8c55-4ff5-8924-a52fcab825e0",
       "name": "Check File Type",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        4144,
-        1760
+        9520,
+        2736
       ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "http://localhost:3000/parse",
+        "url": "http://localhost:3001/parse",
         "sendBody": true,
         "contentType": "multipart-form-data",
         "bodyParameters": {
@@ -126,27 +139,35 @@
           }
         }
       },
-      "id": "2fc61e3d-b787-4655-93b5-35a8b0bfeebe",
+      "id": "8c16bb54-753d-4ff2-a43f-14a96a7a427a",
       "name": "Extract Text from File (HTTP)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        4352,
-        1760
+        9728,
+        2736
       ],
       "notes": "외부 파싱 서비스 호출. FILE_PARSING_SERVICE_URL 환경 변수 설정 필요. 바이너리 데이터는 자동으로 전송됩니다."
     },
     {
       "parameters": {
+        "fields": {
+          "values": [
+            {
+              "name": "text",
+              "stringValue": "={{ $json.text }}"
+            }
+          ]
+        },
         "options": {}
       },
-      "id": "ea939bc5-3bed-44ea-8b59-507b08d04203",
+      "id": "8f3ab634-7965-4777-abd6-a54af8a47ad4",
       "name": "Merge Extracted Text",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.2,
       "position": [
-        4544,
-        1760
+        9920,
+        2736
       ]
     },
     {
@@ -157,39 +178,43 @@
           "messages": [
             {
               "role": "system",
-              "content": "You are a professional HR data analyst. Extract structured information from the provided resume text according to the following rules:  1. **Information to Extract (JSON Format)**:    - \"name\": Name of the person.    - \"gender\": \"남성\" or \"여성\".    - \"birthdate\": \"YYYY-MM-DD\" format.    - \"email\": Email address.    - \"phone\": Phone number.    - \"total_experience\": Total years/months of career (e.g., \"10년 5개월\").    - \"age\": Calculate age based on \"2026-01-24\" (Today). If birthdate is 1988-01-31, age should be 37.    - \"education\": One of [\"고졸\", \"전문학사\", \"학사\", \"석사\", \"박사\"].    - \"industries\": List of experienced industries (e.g., [\"금융\", \"이커머스\"]).    - \"career_details\": List of objects containing:      - \"period\": \"YYYY.MM ~ YYYY.MM\"      - \"industry\": Industry classification for this period.      - \"duration\": Calculated duration in months (e.g., \"금융 8개월\").    - \"skills\": List of technical skills (e.g., [\"React\", \"Node.js\", \"TypeScript\", \"Supabase\"]).    - \"photo_exists\": Boolean (true if a photo is present or mentioned, otherwise false).  2. **Calculation Logic**:    - For \"age\": Use the current date (2026-01-24) and the birthdate to calculate the Korean age or international age as requested.    - For \"career_details\": Analyze each project or workplace, identify the industry, and calculate the exact number of months for each.  3. **Output Rule**:    - Return ONLY valid JSON.    - Language: Korean (except for technical skills)."
+              "content": "You are a professional HR data analyst. Extract structured information from the provided resume text according to the following rules:  1. **Information to Extract (JSON Format)**:    - \"name\": Name of the person.    - \"gender\": \"남성\" or \"여성\".    - \"birthdate\": \"YYYY-MM-DD\" format.    - \"email\": Email address.    - \"phone\": Phone number.    - \"position\": Job position (e.g., \"프론트엔드 개발자\", \"백엔드 개발자\", \"풀스택 개발자\", \"모바일 개발자\", \"데이터 엔지니어\", \"데브옵스\").    - \"experience\": Experience level based on total years (\"주니어\" for <2 years, \"미드\" for 2-5 years, \"시니어\" for 5-10 years, \"엑스퍼트\" for 10+ years) or explicit level mentioned.    - \"total_experience\": Total years/months of career (e.g., \"10년 5개월\").    - \"age\": Calculate age based on \"2026-01-24\" (Today). If birthdate is 1988-01-31, age should be 37.    - \"education\": One of [\"고졸\", \"전문학사\", \"학사\", \"석사\", \"박사\"].    - \"industries\": List of experienced industries (e.g., [\"금융\", \"이커머스\"]).    - \"career_details\": List of objects containing:      - \"period\": \"YYYY.MM ~ YYYY.MM\"      - \"industry\": Industry classification for this period.      - \"duration\": Duration in Korean format. If 1 year or more, use \"X년 Y개월\" format (e.g., \"1년 2개월\", \"2년 4개월\"). If less than 1 year, use \"X개월\" format (e.g., \"8개월\", \"11개월\").    - \"skills\": List of technical skills (e.g., [\"React\", \"Node.js\", \"TypeScript\", \"Supabase\"]).    - \"description\": Professional summary or detailed description of the person's experience and expertise (at least 200 characters, in Korean).    - \"photo_exists\": Boolean (true if a photo is present or mentioned, otherwise false).  2. **Calculation Logic**:    - For \"age\": Use the current date (2026-01-24) and the birthdate to calculate the Korean age or international age as requested.    - For \"career_details.duration\": Calculate the exact duration between start and end dates. Example: 2022년1월~2023년03월 = 14 months = \"1년 2개월\", 2020.01-2022.05 = 28 months = \"2년 4개월\", 2019.03-2020.06 = 15 months = \"1년 3개월\". Always calculate from the first day of start month to the last day of end month (inclusive).    - For \"experience\": Determine based on total_experience or explicit mentions in the resume.  3. **Output Rule**:    - Return ONLY valid JSON.    - Language: Korean (except for technical skills).    - Always include \"description\" field with meaningful content."
+            },
+            {
+              "role": "user",
+              "content": "={{ $json.text }}"
             }
           ]
         },
         "options": {},
         "requestOptions": {}
       },
-      "id": "f0c7ab9c-498d-43ee-b4bf-a474afb49e28",
+      "id": "724fe9d2-66de-48cf-b8a4-e6f462688cf6",
       "name": "AI Analysis - Extract Data",
       "type": "n8n-nodes-base.openAi",
       "typeVersion": 1,
       "position": [
-        4752,
-        1760
+        10128,
+        2736
       ],
       "credentials": {
         "openAiApi": {
-          "id": "IPQ1NweLAtXS2Nki",
+          "id": "0Cog0331X0urS4Ca",
           "name": "OpenAi account"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// 1. 입력 데이터 가져오기\nconst allData = $input.all();\n\n// 첫 번째 입력이 AI Analysis, 두 번째가 HTTP Request입니다.\nconst aiJson = allData[0]?.json || {};\nconst embedJson = allData[1]?.json || {};\n\n// 2. AI 응답 텍스트 추출 및 파싱\nlet aiText = aiJson.choices?.[0]?.message?.content || aiJson.text || aiJson.message?.content || \"\";\nif (typeof aiText === 'object') aiText = aiText.text || \"\";\n\nlet parsed = {};\ntry {\n  // 마크다운 기호 제거 후 JSON 파싱\n  const cleanJson = aiText.replace(//g, \"\").replace(/```/g, \"\").trim();\n  parsed = cleanJson ? JSON.parse(cleanJson) : {};\n} catch (e) {\n  console.error(\"JSON 파싱 실패\");\n}\n\n// 3. 임베딩 벡터 데이터 처리\nlet vectorString = null;\nif (embedJson.data && embedJson.data[0] && embedJson.data[0].embedding) {\n  const arr = embedJson.data[0].embedding;\n  vectorString = \"[\" + arr.join(\",\") + \"]\";\n}\n\n// 4. 최종 결과 반환\nreturn {\n  json: {\n    ...parsed,\n    embedding: vectorString,\n    match_score: 0\n  }\n};"
+        "jsCode": "// 1. 입력 데이터 가져오기\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리될 수 있으므로,\n// 실행 컨텍스트를 활용하여 두 입력을 모두 받도록 처리\nconst allData = $input.all();\n\n// 디버그: 입력 개수 확인\nconsole.log('Prepare Supabase Data - 입력 개수:', allData.length);\nconsole.log('Prepare Supabase Data - 실행 ID:', $execution.id);\n\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로,\n// 두 입력이 모두 있는지 확인하고, 하나만 있으면 에러 발생\n// (실제로는 n8n이 자동으로 두 입력을 합쳐주지만, 확인용)\nif (allData.length < 2) {\n  console.log('경고: 입력이 2개 미만입니다. 병렬 실행이 완료되지 않았을 수 있습니다.');\n  console.log('입력 데이터:', JSON.stringify(allData.map(item => ({ keys: Object.keys(item?.json || {}).slice(0, 5) }))));\n}\n\n// 2. 입력 데이터 자동 판단 (순서에 상관없이)\nlet aiJson = null;\nlet embedJson = null;\n\nfor (let i = 0; i < allData.length; i++) {\n  const item = allData[i];\n  const json = item?.json || item;\n  \n  if (!json) continue;\n  \n  // 디버그: 각 입력의 키 확인\n  if (json && typeof json === 'object') {\n    const keys = Object.keys(json).slice(0, 10);\n    console.log(`입력[${i}] 키:`, keys.join(', '));\n  }\n  \n  // Merge 노드에서 합쳐진 데이터 확인\n  if (json.aiResponse) {\n    aiJson = json.aiResponse;\n    console.log('AI 응답 데이터 발견: aiResponse 필드');\n  }\n  if (json.embeddingResponse) {\n    embedJson = json.embeddingResponse;\n    console.log('Embedding 응답 데이터 발견: embeddingResponse 필드');\n  }\n  \n  // Embedding 데이터 확인 (먼저 확인 - object: 'list' 형식)\n  if (!embedJson) {\n    if (json.object === 'list' && json.data && Array.isArray(json.data)) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: object=list 형식');\n    } else if (json.data && Array.isArray(json.data) && json.data[0]?.embedding) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: data[0].embedding 형식');\n    } else if (json.object && json.data && json.model && json.usage) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: OpenAI Embedding API 응답 형식');\n    }\n  }\n  // Merge된 한 아이템에 AI+Embedding 둘 다 있을 수 있으므로, embedJson 설정 후에도 aiJson 확인 계속\n  \n  // AI Analysis 노드 출력 확인 (Merge된 한 아이템에 index,message,object,data 등이 함께 있을 수 있음)\n  if (!aiJson) {\n    if (json && typeof json === 'object' && json.message && typeof json.message === 'string') {\n      aiJson = { message: { content: json.message } };\n      continue;\n    }\n    if (json && typeof json === 'object' && json.message && json.message.content) {\n      aiJson = json;\n      continue;\n    }\n    // n8n OpenAI 노드가 choices를 반환하는 경우\n    if (json && typeof json === 'object' && json.choices && Array.isArray(json.choices)) {\n      aiJson = json;\n      continue;\n    }\n    // 배열 형식: [{ index: 0, message: { content: '...' } }]\n    if (Array.isArray(json) && json.length > 0) {\n      const firstItem = json[0];\n      if (firstItem && firstItem.message && firstItem.message.content) {\n        aiJson = json;\n        continue;\n      }\n      // n8n이 배열의 첫 번째 항목에 직접 content를 넣는 경우\n      if (firstItem && typeof firstItem === 'object' && firstItem.content) {\n        aiJson = [{ message: { content: firstItem.content } }];\n        continue;\n      }\n    }\n    // 단일 객체에 message.content가 있는 경우\n    if (json && json.message && json.message.content) {\n      aiJson = json;\n      continue;\n    }\n    // n8n이 직접 content 필드를 반환하는 경우\n    if (json && typeof json === 'object' && json.content && typeof json.content === 'string') {\n      aiJson = { message: { content: json.content } };\n      continue;\n    }\n  }\n}\n\n// 3. AI 응답에서 content 추출\nlet aiText = '';\n\nif (aiJson) {\n  // n8n이 직접 message 문자열을 반환하는 경우\n  if (aiJson.message && typeof aiJson.message === 'string') {\n    aiText = aiJson.message;\n  }\n  // 배열 형식: [{ index: 0, message: { content: '...' } }]\n  else if (Array.isArray(aiJson) && aiJson.length > 0) {\n    const firstItem = aiJson[0];\n    if (firstItem && firstItem.message) {\n      if (typeof firstItem.message === 'string') {\n        aiText = firstItem.message;\n      } else if (firstItem.message.content) {\n        aiText = firstItem.message.content;\n      }\n    } else if (firstItem && firstItem.content) {\n      aiText = firstItem.content;\n    }\n  }\n  // choices 형식: { choices: [{ message: { content: '...' } }] }\n  else if (aiJson && typeof aiJson === 'object') {\n    if (aiJson.choices && Array.isArray(aiJson.choices) && aiJson.choices.length > 0) {\n      const choice = aiJson.choices[0];\n      if (choice && choice.message) {\n        if (typeof choice.message === 'string') {\n          aiText = choice.message;\n        } else if (choice.message.content) {\n          aiText = choice.message.content;\n        }\n      }\n    } else if (aiJson.message) {\n      if (typeof aiJson.message === 'string') {\n        aiText = aiJson.message;\n      } else if (aiJson.message.content) {\n        aiText = aiJson.message.content;\n      }\n    } else if (aiJson.content) {\n      aiText = aiJson.content;\n    }\n  }\n}\n\n// AI 응답이 없으면 에러\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로,\n// embedding만 있는 경우에는 이 실행을 건너뛰고 다음 실행을 기다립니다\nif (!aiText || aiText.trim().length === 0) {\n  const debugInfo = allData.map((item, idx) => {\n    const json = item?.json || item;\n    const type = Array.isArray(json) ? 'array' : typeof json;\n    const keys = json && typeof json === 'object' ? Object.keys(json).slice(0, 10) : [];\n    const sample = json && typeof json === 'object' ? JSON.stringify(json).substring(0, 200) : String(json).substring(0, 200);\n    return `입력[${idx}]: 타입=${type}, 키=${keys.join(',')}, 샘플=${sample}`;\n  }).join('; ');\n  \n  // embedding만 있는 경우: 명확한 에러 메시지 제공\n  // n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로, 두 입력이 모두 있을 때만 처리해야 합니다\n  if (embedJson) {\n    // embedding만 있는 경우: 명확한 해결 방법 안내\n    console.log('경고: Embedding 데이터만 받았습니다. AI 응답이 없습니다.');\n    console.log('해결 방법: n8n UI에서 AI Analysis - Extract Data와 HTTP Request 노드 사이에 Merge 노드를 추가하고 Mode를 Combine으로 설정하세요.');\n    throw new Error('AI 응답을 찾을 수 없습니다. Embedding 데이터만 받았습니다. 두 입력(AI Analysis와 Embedding)이 모두 필요합니다. n8n UI에서 Merge 노드를 추가하고 Mode를 Combine으로 설정하세요. 입력 개수: ' + allData.length + '. ' + debugInfo);\n  } else {\n    throw new Error('AI 응답을 찾을 수 없습니다. 입력 개수: ' + allData.length + '. ' + debugInfo);\n  }\n}\n\n// 3. 마크다운 코드 블록 제거 및 JSON 파싱\nlet parsed = {};\ntry {\n  // ```json과 ``` 제거\n  let cleanJson = aiText;\n  if (cleanJson.includes('```json')) {\n    cleanJson = cleanJson.split('```json')[1] || cleanJson;\n  }\n  if (cleanJson.includes('```')) {\n    cleanJson = cleanJson.split('```')[0] || cleanJson;\n  }\n  cleanJson = cleanJson.trim();\n  \n  parsed = JSON.parse(cleanJson);\n} catch (e) {\n  throw new Error('JSON 파싱 실패: ' + e.message);\n}\n\n// 4. 변환 함수들\nfunction convertDomainToEnglish(domain) {\n  if (!domain) return null;\n  const allowedDomains = ['finance', 'ecommerce', 'healthcare', 'education', 'manufacturing', 'logistics'];\n  const domainMap = {\n    '금융': 'finance',\n    '전자상거래': 'ecommerce',\n    '이커머스': 'ecommerce',\n    '헬스케어': 'healthcare',\n    '의료': 'healthcare',\n    '교육': 'education',\n    '제조': 'manufacturing',\n    '제조업': 'manufacturing',\n    '물류': 'logistics',\n    '로지스틱스': 'logistics'\n  };\n  if (Array.isArray(domain)) {\n    return domain.map(d => domainMap[d] || d).filter(d => d && allowedDomains.includes(d));\n  }\n  const converted = domainMap[domain] || domain;\n  return allowedDomains.includes(converted) ? converted : null;\n}\n\nfunction convertPositionToEnglish(position) {\n  if (!position) return null;\n  const allowedPositions = ['frontend', 'backend', 'fullstack', 'mobile', 'data', 'devops'];\n  const positionMap = {\n    '프론트엔드': 'frontend',\n    '프론트엔드 개발자': 'frontend',\n    '퍼블리셔': 'frontend',\n    '웹퍼블리셔': 'frontend',\n    'UI개발자': 'frontend',\n    '백엔드': 'backend',\n    '백엔드 개발자': 'backend',\n    '서버개발자': 'backend',\n    '풀스택': 'fullstack',\n    '풀스택 개발자': 'fullstack',\n    '모바일': 'mobile',\n    '모바일 개발자': 'mobile',\n    '안드로이드': 'mobile',\n    'iOS': 'mobile',\n    '데이터': 'data',\n    '데이터 엔지니어': 'data',\n    '데이터 분석가': 'data',\n    '데브옵스': 'devops',\n    'DevOps': 'devops',\n    '인프라': 'devops'\n  };\n  const converted = positionMap[position] || position;\n  return allowedPositions.includes(converted) ? converted : null;\n}\n\nfunction convertExperienceToEnglish(experience) {\n  if (!experience) return null;\n  const experienceMap = {\n    '주니어': 'junior',\n    '미드': 'mid',\n    '시니어': 'senior',\n    '엑스퍼트': 'expert',\n    'expert': 'expert'\n  };\n  if (typeof experience === 'string' && experience.includes('년')) {\n    const numStr = experience.replace(/[^0-9]/g, '');\n    const years = parseInt(numStr) || 0;\n    if (years < 2) return 'junior';\n    if (years < 5) return 'mid';\n    if (years < 10) return 'senior';\n    return 'expert';\n  }\n  return experienceMap[experience] || experience;\n}\n\nfunction formatPostgresArray(arr) {\n  if (!arr || !Array.isArray(arr) || arr.length === 0) return null;\n  const escaped = arr.map(item => {\n    let str = String(item);\n    let result = '';\n    for (let i = 0; i < str.length; i++) {\n      const char = str[i];\n      if (char === '\"') {\n        result += '\\\\\"';\n      } else if (char === '\\\\') {\n        result += '\\\\\\\\';\n      } else {\n        result += char;\n      }\n    }\n    return result;\n  });\n  return '{' + escaped.join(',') + '}';\n}\n\n// 5. 데이터 변환 (한글 키 폴백: AI가 이메일/직무/경력 등 한글 키로 반환할 수 있음)\nlet domain = null;\nif (parsed.industries && Array.isArray(parsed.industries) && parsed.industries.length > 0) {\n  domain = convertDomainToEnglish(parsed.industries);\n} else if (parsed.domain || parsed.도메인) {\n  domain = convertDomainToEnglish(parsed.domain || parsed.도메인);\n}\n\nconst positionRaw = parsed.position || parsed.직무;\nconst position = convertPositionToEnglish(positionRaw);\nlet experience = convertExperienceToEnglish(parsed.experience || parsed.경력 || parsed.total_experience || parsed.총경력);\n\n// 6. PostgreSQL 배열 형식 변환\nlet domainFormatted = null;\nif (domain) {\n  if (Array.isArray(domain) && domain.length > 0) {\n    domainFormatted = formatPostgresArray(domain);\n  } else if (domain) {\n    domainFormatted = formatPostgresArray([domain]);\n  }\n}\n\nlet skillsFormatted = null;\nif (parsed.skills && Array.isArray(parsed.skills) && parsed.skills.length > 0) {\n  skillsFormatted = formatPostgresArray(parsed.skills);\n}\n\n// 7. description 처리 (한글 키 폴백)\nlet description = parsed.description || parsed.상세설명 || null;\n\n// 8. embedding 처리 (pgvector 형식으로 변환)\n// Supabase의 pgvector는 JavaScript 배열 형식을 받아서 자동으로 vector 타입으로 변환합니다\nlet embeddingArray = null;\nif (embedJson) {\n  console.log('Embedding JSON 처리 시작');\n  if (embedJson.data && Array.isArray(embedJson.data) && embedJson.data.length > 0) {\n    const embeddingData = embedJson.data[0];\n    if (embeddingData && Array.isArray(embeddingData.embedding)) {\n      embeddingArray = embeddingData.embedding;\n      console.log('Embedding 벡터 생성 완료, 길이:', embeddingArray.length);\n      console.log('Embedding 벡터 샘플 (처음 5개):', embeddingArray.slice(0, 5));\n    } else {\n      console.log('Embedding 데이터 형식 오류: embeddingData.embedding이 배열이 아님');\n    }\n  } else {\n    console.log('Embedding 데이터 형식 오류: data가 배열이 아니거나 비어있음');\n  }\n} else {\n  console.log('경고: Embedding 데이터가 없습니다. 입력 개수:', allData.length);\n  // Embedding이 없어도 계속 진행 (선택적 필드)\n}\n\n// 9. 필수 필드 (한글 키 폴백 + 누락 시 기본값으로 저장하여 워크플로 중단 방지)\nconst name = String(parsed.name || parsed.이름 || '').trim() || 'Unknown';\nconst email = String(parsed.email || parsed.이메일 || '').trim() || 'unknown@profile.local';\nconst positionFinal = position || 'fullstack';\nconst experienceFinal = experience || 'mid';\n\nif (name === 'Unknown' || email === 'unknown@profile.local') {\n  console.log('일부 필드가 추출되지 않아 기본값으로 저장합니다. name:', name, 'email:', email, 'position:', positionFinal, 'experience:', experienceFinal);\n}\n\n// 10. embedding 최종 확인 및 디버그if (embeddingArray) {  console.log('✅ Embedding 배열 준비 완료, 길이:', embeddingArray.length);} else {  console.log('❌ 경고: Embedding 배열이 null입니다.');}// 11. 최종 결과 반환\n// embedding은 JavaScript 배열 형식으로 전달 (Supabase REST API가 자동으로 pgvector로 변환)\nreturn {\n  json: {\n    name: name,\n    email: email,\n    phone: parsed.phone || parsed.전화번호 || null,\n    position: positionFinal,\n    experience: experienceFinal,\n    domain: domainFormatted,\n    skills: skillsFormatted,\n    description: description,\n    embedding: embeddingArray && embeddingArray.length > 0 ? '[' + embeddingArray.join(',') + ']' : null,\n    match_score: 0\n  }\n};"
       },
-      "id": "6a703035-e435-44df-8674-fcdec367ed9a",
+      "id": "c1cb9524-07e4-4b92-b7bb-a075391ff826",
       "name": "Prepare Supabase Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        4944,
-        1760
+        10320,
+        2736
       ]
     },
     {
@@ -199,54 +224,54 @@
           "fieldValues": [
             {
               "fieldId": "name",
-              "fieldValue": "=={{ $json.name }}"
+              "fieldValue": "={{ $json.name }}"
             },
             {
               "fieldId": "email",
-              "fieldValue": "=={{ $json.email }}"
+              "fieldValue": "={{ $json.email }}"
             },
             {
               "fieldId": "phone",
-              "fieldValue": "=={{ $json.phone }}"
+              "fieldValue": "={{ $json.phone }}"
             },
             {
               "fieldId": "position",
-              "fieldValue": "=={{ $json.position }}"
+              "fieldValue": "={{ $json.position }}"
             },
             {
               "fieldId": "experience",
-              "fieldValue": "=={{ $json.experience }}"
+              "fieldValue": "={{ $json.experience }}"
             },
             {
               "fieldId": "domain",
-              "fieldValue": "=={{ $json.domain }}"
+              "fieldValue": "={{ $json.domain }}"
             },
             {
               "fieldId": "skills",
-              "fieldValue": "=={{ $json.skills }}"
+              "fieldValue": "={{ $json.skills }}"
             },
             {
               "fieldId": "description",
-              "fieldValue": "=={{ $json.description }}"
+              "fieldValue": "={{ $json.description }}"
             },
             {
               "fieldId": "embedding",
-              "fieldValue": "=={{ $json.embedding }}"
+              "fieldValue": "={{ $json.embedding }}"
             }
           ]
         }
       },
-      "id": "6a04779e-009d-4324-b5c3-66e3edd73e08",
+      "id": "78de813a-6869-4702-b856-71d86cab398f",
       "name": "Save to Supabase",
       "type": "n8n-nodes-base.supabase",
       "typeVersion": 1,
       "position": [
-        5152,
-        1760
+        10528,
+        2736
       ],
       "credentials": {
         "supabaseApi": {
-          "id": "NbeQ02PRX58rgfhA",
+          "id": "3BOzFfPTHSMTrEJY",
           "name": "Supabase account"
         }
       }
@@ -257,13 +282,13 @@
         "responseBody": "={{ { success: true, message: 'Profile created successfully', id: $json.id } }}",
         "options": {}
       },
-      "id": "6adaa227-a215-4e9a-9460-a02386d3b784",
+      "id": "67b44983-0520-4b01-a695-11de4d0a87e8",
       "name": "Respond Success",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        5344,
-        1760
+        10720,
+        2736
       ]
     },
     {
@@ -272,13 +297,13 @@
         "responseBody": "={{ { success: false, error: $json.error || 'Unknown error' } }}",
         "options": {}
       },
-      "id": "63cfdc5d-c7bd-4234-b82c-79e60c71aabd",
+      "id": "8c923270-1005-4f5f-8caf-6f63d16c248e",
       "name": "Respond Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1,
       "position": [
-        4544,
-        1968
+        9920,
+        2944
       ]
     },
     {
@@ -305,21 +330,31 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        4912,
-        2080
+        10288,
+        3056
       ],
-      "id": "ec5206b0-55b9-4668-b698-4cfbf72bbf41",
+      "id": "44c63cae-e624-4314-9290-bbf87c1bddca",
       "name": "HTTP Request",
       "credentials": {
-        "openAiApi": {
-          "id": "IPQ1NweLAtXS2Nki",
-          "name": "OpenAi account"
-        },
         "httpHeaderAuth": {
-          "id": "4XyTn8H5Tzt8StjQ",
+          "id": "18vwAXK7vVM1Yf9z",
           "name": "Header Auth account"
         }
       }
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition"
+      },
+      "id": "merge-ai-embedding-001",
+      "name": "Merge AI and Embedding",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [
+        10260,
+        2896
+      ]
     }
   ],
   "pinData": {},
@@ -336,6 +371,17 @@
       ]
     },
     "Set File Info": {
+      "main": [
+        [
+          {
+            "node": "Resolve File Type",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve File Type": {
       "main": [
         [
           {
@@ -363,6 +409,17 @@
       ]
     },
     "AI Analysis - Extract Data": {
+      "main": [
+        [
+          {
+            "node": "Merge AI and Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge AI and Embedding": {
       "main": [
         [
           {
@@ -399,9 +456,9 @@
       "main": [
         [
           {
-            "node": "Prepare Supabase Data",
+            "node": "Merge AI and Embedding",
             "type": "main",
-            "index": 0
+            "index": 1
           }
         ]
       ]
@@ -436,16 +493,18 @@
       ]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": false
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
   },
-  "versionId": "6f3ba9b1-1bfe-4416-816d-2e7d1edc5d24",
+  "versionId": "884d851e-4538-40d6-b5ef-a0e6691a6cd9",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "a9e03486adb0f3509c6deef16b2a8faec12283789a98c01ce9c9fd09fe64fb97"
+    "instanceId": "f64f4f276fc1b05bf6e38c8a2d8b1aa85578864d6c3103b10223ad89f0ab9443"
   },
-  "id": "4wjb2MIzVaA4-pBjLRsl0",
+  "id": "vlmktNLfpLosKkRmaS2Bp",
   "tags": []
 }

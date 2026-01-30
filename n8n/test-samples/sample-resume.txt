@@ -1,16 +1,16 @@
-이름: 김동윤
-이메일: kim.gildong@example.com
-전화번호: 010-1234-5678
+이름: 김크109
+이메일: co6209.gildong@example.com
+전화번호: 010-4237-2659
 
-직무: 프론트엔드 개발자
-경력: 5년 (senior)
+직무: 퍼블리셔
+경력: 11년
 
 도메인 경험:
 - 금융
 - 전자상거래
 
 기술 스택:
-React, TypeScript, Next.js, Node.js, PostgreSQL, Tailwind CSS
+React, mongoDB, TypeScript
 
 상세 설명:
 금융권 프로젝트에서 3년간 프론트엔드 개발 경험을 보유하고 있습니다.
@@ -18,7 +18,7 @@ React, TypeScript, Next.js, Node.js, PostgreSQL, Tailwind CSS
 전자상거래 플랫폼 구축 경험 2년으로, 사용자 경험 최적화에 중점을 두고 있습니다.
 
 주요 프로젝트:
-1. KB카드 모바일 앱 개발 (2022.03-2023.05)
+1. KB카드 모바일 앱 개발 (2022년2월-2023년 05월)
    - React Native 기반 하이브리드 앱 개발
    - 사용자 100만+ 달성
 

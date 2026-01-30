@@ -1,90 +1,100 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Shield, Mail, Phone, MapPin, Calendar } from "lucide-react";
+import { ArrowLeft, Shield, Mail, Phone, Calendar } from "lucide-react";
 import Link from "next/link";
 import { CapabilityChart } from "./capability-chart";
 import { CareerTimeline } from "./career-timeline";
+import type { Database } from "@/lib/supabase/types";
 
-// 임시 데이터 (나중에 Supabase에서 가져올 예정)
-const profileData = {
-  id: "1",
-  name: "김**",
-  maskedName: "김**",
-  position: "프론트엔드 개발자",
-  email: "kim***@example.com",
-  phone: "010-****-****",
-  location: "서울",
-  experience: "5년",
-  domain: "금융",
-  matchScore: 95,
-  skills: ["React", "TypeScript", "Next.js", "Tailwind CSS", "Zustand"],
-  capabilities: {
-    frontend: 95,
-    backend: 60,
-    mobile: 40,
-    devops: 50,
-    database: 55,
-    testing: 75,
-  },
-  career: [
-    {
-      id: "1",
-      company: "A금융그룹",
-      position: "시니어 프론트엔드 개발자",
-      period: "2022.03 - 현재",
-      description: "KB카드 모바일 앱 개발 및 유지보수, React Native 기반 하이브리드 앱 개발",
-      technologies: ["React Native", "TypeScript", "Redux"],
-    },
-    {
-      id: "2",
-      company: "B은행",
-      position: "프론트엔드 개발자",
-      period: "2020.01 - 2022.02",
-      description: "신한은행 웹뱅킹 시스템 개발, React 기반 SPA 구축",
-      technologies: ["React", "TypeScript", "Next.js"],
-    },
-    {
-      id: "3",
-      company: "C스타트업",
-      position: "주니어 프론트엔드 개발자",
-      period: "2019.01 - 2019.12",
-      description: "전자상거래 플랫폼 프론트엔드 개발",
-      technologies: ["React", "JavaScript", "CSS"],
-    },
-  ],
-  projects: [
-    {
-      id: "1",
-      name: "KB카드 모바일 앱",
-      role: "리드 개발자",
-      period: "2022.03 - 2023.12",
-      description: "React Native 기반 모바일 앱 개발, 사용자 100만+ 달성",
-      technologies: ["React Native", "TypeScript", "Redux"],
-    },
-    {
-      id: "2",
-      name: "신한은행 웹뱅킹",
-      role: "프론트엔드 개발자",
-      period: "2020.06 - 2022.02",
-      description: "Next.js 기반 웹뱅킹 시스템 구축, 성능 최적화",
-      technologies: ["Next.js", "TypeScript", "Tailwind CSS"],
-    },
-  ],
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
+type CapabilityRow = Database["public"]["Tables"]["profile_capabilities"]["Row"];
+type ProjectRow = Database["public"]["Tables"]["profile_projects"]["Row"];
+
+const positionLabels: Record<string, string> = {
+  frontend: "프론트엔드 개발자",
+  backend: "백엔드 개발자",
+  fullstack: "풀스택 개발자",
+  mobile: "모바일 개발자",
+  data: "데이터 엔지니어",
+  devops: "DevOps 엔지니어",
 };
 
-export function ProfileDetail({ id }: { id: string }) {
-  const [profile] = useState(profileData);
+const experienceLabels: Record<string, string> = {
+  junior: "1-3년",
+  mid: "3-5년",
+  senior: "5-7년",
+  expert: "7년 이상",
+};
 
-  // 나중에 Supabase에서 id를 사용하여 데이터 가져오기
-  // useEffect(() => {
-  //   fetchProfile(id).then(setProfile);
-  // }, [id]);
+const domainLabels: Record<string, string> = {
+  finance: "금융",
+  ecommerce: "전자상거래",
+  healthcare: "의료",
+  education: "교육",
+  manufacturing: "제조",
+  logistics: "물류",
+};
+
+function mapCapabilities(cap: CapabilityRow | null): {
+  frontend: number;
+  backend: number;
+  mobile: number;
+  devops: number;
+  database: number;
+  testing: number;
+} {
+  if (!cap) {
+    return { frontend: 0, backend: 0, mobile: 0, devops: 0, database: 0, testing: 0 };
+  }
+  return {
+    frontend: cap.markup_precision ?? 0,
+    backend: cap.js_ts_logic ?? 0,
+    mobile: cap.framework_proficiency ?? 0,
+    devops: cap.web_optimization ?? 0,
+    database: cap.ui_ux_design ?? 0,
+    testing: cap.accessibility ?? 0,
+  };
+}
+
+function mapProjects(rows: ProjectRow[]): {
+  id: string;
+  name: string;
+  role: string;
+  period: string;
+  description: string;
+  technologies: string[];
+}[] {
+  return rows.map((p) => ({
+    id: p.id,
+    name: p.project_name,
+    role: p.industry,
+    period: p.duration,
+    description: "",
+    technologies: [],
+  }));
+}
+
+interface ProfileDetailProps {
+  profile: ProfileRow;
+  capabilities: CapabilityRow | null;
+  projects: ProjectRow[];
+}
+
+export function ProfileDetail({ profile, capabilities, projects }: ProfileDetailProps) {
+  const displayName = profile.name;
+  const positionLabel = positionLabels[profile.position] ?? profile.position;
+  const experienceLabel = experienceLabels[profile.experience] ?? profile.experience;
+  const domains = profile.domain ?? [];
+  const domainList = Array.isArray(domains) ? domains : [domains];
+  const caps = mapCapabilities(capabilities);
+  const career: { id: string; company: string; position: string; period: string; description: string; technologies: string[] }[] = [];
+  const projectItems = mapProjects(projects);
+  const hasCapabilities = Object.values(caps).some((v) => v > 0);
+  const hasCareerOrProjects = career.length > 0 || projectItems.length > 0;
 
   return (
     <div className="space-y-8">
@@ -103,20 +113,19 @@ export function ProfileDetail({ id }: { id: string }) {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* 좌측: 기본 정보 */}
         <div className="lg:col-span-1 space-y-6">
           <Card>
             <CardHeader>
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
                   <AvatarFallback className="text-2xl">
-                    {profile.maskedName.charAt(0)}
+                    {displayName.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <CardTitle className="text-xl">{profile.maskedName}</CardTitle>
+                  <CardTitle className="text-xl">{displayName}</CardTitle>
                   <CardDescription className="mt-1">
-                    {profile.position}
+                    {positionLabel}
                   </CardDescription>
                 </div>
               </div>
@@ -130,67 +139,96 @@ export function ProfileDetail({ id }: { id: string }) {
                   </span>
                   <Shield className="h-3 w-3 text-muted-foreground ml-auto" aria-label="마스킹 처리됨" />
                 </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <Phone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span className="text-muted-foreground">
-                    {profile.phone}
-                  </span>
-                  <Shield className="h-3 w-3 text-muted-foreground ml-auto" aria-label="마스킹 처리됨" />
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <MapPin className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span>{profile.location}</span>
-                </div>
+                {profile.phone && (
+                  <div className="flex items-center gap-3 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-muted-foreground">
+                      {profile.phone}
+                    </span>
+                    <Shield className="h-3 w-3 text-muted-foreground ml-auto" aria-label="마스킹 처리됨" />
+                  </div>
+                )}
                 <div className="flex items-center gap-3 text-sm">
                   <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span>경력 {profile.experience}</span>
+                  <span>경력 {experienceLabel}</span>
                 </div>
               </div>
 
               <div className="pt-4 border-t">
                 <p className="text-sm font-medium mb-2">기술 스택</p>
                 <div className="flex flex-wrap gap-2">
-                  {profile.skills.map((skill) => (
-                    <Badge key={skill} variant="secondary">
-                      {skill}
-                    </Badge>
-                  ))}
+                  {(profile.skills ?? []).length > 0 ? (
+                    profile.skills.map((skill) => (
+                      <Badge key={skill} variant="secondary">
+                        {skill}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">등록된 기술 없음</span>
+                  )}
                 </div>
               </div>
 
               <div className="pt-4 border-t">
                 <p className="text-sm font-medium mb-2">도메인 경험</p>
-                <Badge variant="outline">{profile.domain}</Badge>
+                <div className="flex flex-wrap gap-2">
+                  {domainList.length > 0 ? (
+                    domainList.map((d) => (
+                      <Badge key={d} variant="outline">
+                        {domainLabels[d] ?? d}
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-sm text-muted-foreground">등록된 도메인 없음</span>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>AI 역량 분석</CardTitle>
-              <CardDescription>
-                AI가 분석한 기술 역량 그래프
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CapabilityChart capabilities={profile.capabilities} />
-            </CardContent>
-          </Card>
+          {hasCapabilities && (
+            <Card>
+              <CardHeader>
+                <CardTitle>AI 역량 분석</CardTitle>
+                <CardDescription>
+                  AI가 분석한 기술 역량 그래프
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CapabilityChart capabilities={caps} />
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* 우측: 경력 상세 */}
         <div className="lg:col-span-2 space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>경력 기술서</CardTitle>
-              <CardDescription>
-                상세한 경력 및 프로젝트 이력
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CareerTimeline career={profile.career} projects={profile.projects} />
-            </CardContent>
-          </Card>
+          {hasCareerOrProjects ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>경력 기술서</CardTitle>
+                <CardDescription>
+                  상세한 경력 및 프로젝트 이력
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CareerTimeline career={career} projects={projectItems} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>경력 기술서</CardTitle>
+                <CardDescription>
+                  상세한 경력 및 프로젝트 이력
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground py-4">
+                  등록된 경력·프로젝트 이력이 없습니다.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

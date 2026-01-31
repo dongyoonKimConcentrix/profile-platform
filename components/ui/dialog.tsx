@@ -105,6 +105,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
 
 function DialogTitle({
   className,
+  id: _id,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Title>) {
   return (

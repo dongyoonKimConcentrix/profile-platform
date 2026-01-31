@@ -27,14 +27,18 @@ export type Database = {
       profiles: {
         Row: {
           id: string
-          name: string
+          name_ko: string
+          name_en: string | null
           email: string
           phone: string | null
-          position: 'frontend' | 'backend' | 'fullstack' | 'mobile' | 'data' | 'devops'
-          experience: 'junior' | 'mid' | 'senior' | 'expert'
-          domain: ('finance' | 'ecommerce' | 'healthcare' | 'education' | 'manufacturing' | 'logistics')[] | null
+          job_grade: '사원' | '대리' | '과장' | '차장' | '부장' | '실장' | '이사' | null
+          team: string | null
+          education_school: string | null
+          education: '고졸' | '전문학사' | '학사' | '석사' | '박사' | null
+          position_role: '기획자' | '디자이너' | '퍼블리셔' | '프론트엔드개발자' | '백엔드개발자' | null
+          industry_experience: string[] | null
           skills: string[]
-          description: string | null
+          career_description: string | null
           match_score: number
           embedding: number[] | null
           created_at: string
@@ -42,14 +46,18 @@ export type Database = {
         }
         Insert: {
           id?: string
-          name: string
+          name_ko: string
+          name_en?: string | null
           email: string
           phone?: string | null
-          position: 'frontend' | 'backend' | 'fullstack' | 'mobile' | 'data' | 'devops'
-          experience: 'junior' | 'mid' | 'senior' | 'expert'
-          domain?: ('finance' | 'ecommerce' | 'healthcare' | 'education' | 'manufacturing' | 'logistics')[] | null
+          job_grade?: '사원' | '대리' | '과장' | '차장' | '부장' | '실장' | '이사' | null
+          team?: string | null
+          education_school?: string | null
+          education?: '고졸' | '전문학사' | '학사' | '석사' | '박사' | null
+          position_role?: '기획자' | '디자이너' | '퍼블리셔' | '프론트엔드개발자' | '백엔드개발자' | null
+          industry_experience?: string[] | null
           skills?: string[]
-          description?: string | null
+          career_description?: string | null
           match_score?: number
           embedding?: number[] | null
           created_at?: string
@@ -57,14 +65,18 @@ export type Database = {
         }
         Update: {
           id?: string
-          name?: string
+          name_ko?: string
+          name_en?: string | null
           email?: string
           phone?: string | null
-          position?: 'frontend' | 'backend' | 'fullstack' | 'mobile' | 'data' | 'devops'
-          experience?: 'junior' | 'mid' | 'senior' | 'expert'
-          domain?: ('finance' | 'ecommerce' | 'healthcare' | 'education' | 'manufacturing' | 'logistics')[] | null
+          job_grade?: '사원' | '대리' | '과장' | '차장' | '부장' | '실장' | '이사' | null
+          team?: string | null
+          education_school?: string | null
+          education?: '고졸' | '전문학사' | '학사' | '석사' | '박사' | null
+          position_role?: '기획자' | '디자이너' | '퍼블리셔' | '프론트엔드개발자' | '백엔드개발자' | null
+          industry_experience?: string[] | null
           skills?: string[]
-          description?: string | null
+          career_description?: string | null
           match_score?: number
           embedding?: number[] | null
           created_at?: string
@@ -134,6 +146,29 @@ export type Database = {
           industry?: string
           project_name?: string
           duration?: string
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      profile_project_careers: {
+        Row: {
+          id: string
+          profile_id: string
+          project_name: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          profile_id: string
+          project_name: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          profile_id?: string
+          project_name?: string
           created_at?: string
           updated_at?: string
         }

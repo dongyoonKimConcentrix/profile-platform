@@ -21,34 +21,32 @@ import {
 
 interface Profile {
   id: string;
-  name: string;
+  name_ko: string;
+  name_en: string | null;
   email: string;
-  position: string;
-  experience: string;
-  domain: string | string[] | null;
+  phone: string | null;
+  job_grade: string | null;
+  team: string | null;
+  education_school: string | null;
+  education: string | null;
+  position_role: string | null;
+  industry_experience: string[] | null;
   skills: string[];
+  career_description: string | null;
   match_score: number;
 }
 
-const positionLabels: Record<string, string> = {
-  frontend: "프론트엔드 개발자",
-  backend: "백엔드 개발자",
-  fullstack: "풀스택 개발자",
-  mobile: "모바일 개발자",
-  data: "데이터 엔지니어",
-  devops: "DevOps 엔지니어",
+const positionRoleLabels: Record<string, string> = {
+  기획자: "기획자",
+  디자이너: "디자이너",
+  퍼블리셔: "퍼블리셔",
+  프론트엔드개발자: "프론트엔드 개발자",
+  백엔드개발자: "백엔드 개발자",
 };
 
-const experienceLabels: Record<string, string> = {
-  junior: "1-3년",
-  mid: "3-5년",
-  senior: "5-7년",
-  expert: "7년 이상",
-};
-
-const domainLabels: Record<string, string> = {
+const industryLabels: Record<string, string> = {
   finance: "금융",
-  ecommerce: "전자상거래",
+  ecommerce: "이커머스",
   healthcare: "의료",
   education: "교육",
   manufacturing: "제조",
@@ -132,9 +130,11 @@ export function AdminProfileList() {
     if (!activeSearchQuery) return true;
     const query = activeSearchQuery.toLowerCase();
     return (
-      profile.name.toLowerCase().includes(query) ||
-      positionLabels[profile.position]?.toLowerCase().includes(query) ||
-      profile.skills.some((skill) => skill.toLowerCase().includes(query))
+      (profile.name_ko || "").toLowerCase().includes(query) ||
+      (profile.name_en || "").toLowerCase().includes(query) ||
+      (profile.team || "").toLowerCase().includes(query) ||
+      positionRoleLabels[profile.position_role || ""]?.toLowerCase().includes(query) ||
+      (profile.skills || []).some((skill) => skill.toLowerCase().includes(query))
     );
   });
 
@@ -238,17 +238,19 @@ export function AdminProfileList() {
                   <div className="flex items-start gap-4 mb-4">
                     <Avatar className="h-12 w-12">
                       <AvatarFallback>
-                        {profile.name.charAt(0)}
+                        {(profile.name_ko || "?").charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate">{profile.name}</h3>
+                      <h3 className="font-semibold truncate">{profile.name_ko}{profile.name_en ? ` (${profile.name_en})` : ""}</h3>
                       <p className="text-sm text-muted-foreground">
-                        {positionLabels[profile.position] || profile.position}
+                        {positionRoleLabels[profile.position_role || ""] || profile.position_role || "-"}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        경력 {experienceLabels[profile.experience] || profile.experience}
-                      </p>
+                      {(profile.job_grade || profile.team) && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {[profile.job_grade, profile.team].filter(Boolean).join(" · ")}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-4">
@@ -262,28 +264,17 @@ export function AdminProfileList() {
                       <span className="text-xs text-muted-foreground">기술 스택 없음</span>
                     )}
                   </div>
-                  {profile.domain && (() => {
-                    const domains = Array.isArray(profile.domain) ? profile.domain : [profile.domain];
-                    return (
-                      <div className="pt-3 border-t mb-4">
-                        <div className="flex flex-wrap gap-2">
-                          {domains.map((domain) => (
-                            <div key={domain} className="flex items-center">
-                              <span
-                                className={`w-8 h-8 flex items-center justify-center ${getDomainBgClass(domain)} rounded-lg text-lg mr-2`}
-                                aria-hidden="true"
-                              >
-                                {getDomainIcon(domain)}
-                              </span>
-                              <p className="text-sm font-bold text-slate-800">
-                                {domainLabels[domain] || domain}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
+                  {profile.industry_experience && profile.industry_experience.length > 0 && (
+                    <div className="pt-3 border-t mb-4">
+                      <div className="flex flex-wrap gap-2">
+                        {profile.industry_experience.map((ind) => (
+                          <span key={ind} className={`inline-flex items-center px-2 py-1 rounded ${getDomainBgClass(ind)} text-xs font-medium`}>
+                            {getDomainIcon(ind)} {industryLabels[ind] || ind}
+                          </span>
+                        ))}
                       </div>
-                    );
-                  })()}
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Button
                       asChild
@@ -301,7 +292,7 @@ export function AdminProfileList() {
                       size="sm"
                       className="flex-1"
                       onClick={() => handleDelete(profile.id)}
-                      aria-label={`${profile.name} 삭제`}
+                      aria-label={`${profile.name_ko} 삭제`}
                     >
                       <Trash2 className="h-4 w-4 mr-1" aria-hidden="true" />
                       삭제
@@ -322,8 +313,8 @@ export function AdminProfileList() {
 
       <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
+          <DialogTitle>인력 삭제 확인</DialogTitle>
           <DialogHeader>
-            <DialogTitle>인력 삭제 확인</DialogTitle>
             <DialogDescription>
               정말로 이 인력을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
             </DialogDescription>

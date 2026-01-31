@@ -1,10 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Users, Search, LayoutDashboard } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Users, Search, LayoutDashboard, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import type { User } from "@supabase/supabase-js";
 
 const navigation = [
   { name: "대시보드", href: "/", icon: LayoutDashboard },
@@ -14,6 +17,24 @@ const navigation = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: u } }) => setUser(u));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  };
 
   return (
     <nav
@@ -48,6 +69,24 @@ export function Navbar() {
                 </Button>
               );
             })}
+            {user ? (
+              <Button
+                variant="ghost"
+                onClick={handleLogout}
+                className="gap-2"
+                aria-label="로그아웃"
+              >
+                <LogOut className="h-4 w-4" aria-hidden="true" />
+                <span className="sr-only sm:not-sr-only">로그아웃</span>
+              </Button>
+            ) : (
+              <Button asChild variant="ghost" className="gap-2" aria-label="로그인">
+                <Link href="/login">
+                  <LogIn className="h-4 w-4" aria-hidden="true" />
+                  <span className="sr-only sm:not-sr-only">로그인</span>
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </div>

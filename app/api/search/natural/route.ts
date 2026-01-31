@@ -2,37 +2,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createServerAdminClient } from '@/lib/supabase/server-admin';
 
-/** 자연어 쿼리에서 도메인 키워드 추출 (금융권, 이커머스 등) -> Supabase domain 값 */
-function extractDomainFromQuery(query: string): ('finance' | 'ecommerce' | 'healthcare' | 'education' | 'manufacturing' | 'logistics')[] {
-  const domains: ('finance' | 'ecommerce' | 'healthcare' | 'education' | 'manufacturing' | 'logistics')[] = [];
-  if (/금융|금융권|은행|증권|보험/.test(query)) domains.push('finance');
-  if (/이커머스|전자상거래|쇼핑몰/.test(query)) domains.push('ecommerce');
-  if (/의료|헬스케어|병원|헬스/.test(query)) domains.push('healthcare');
-  if (/교육|에듀/.test(query)) domains.push('education');
-  if (/제조|제조업|공장/.test(query)) domains.push('manufacturing');
-  if (/물류|로지스틱스|배송/.test(query)) domains.push('logistics');
-  return [...new Set(domains)];
+/** 자연어 쿼리에서 산업군 키워드 추출 (금융, 이커머스 등) -> DB industry_experience 값(한글) */
+function extractIndustryFromQuery(query: string): string[] {
+  const industries: string[] = [];
+  if (/금융|금융권|은행|증권|보험/.test(query)) industries.push('금융');
+  if (/이커머스|전자상거래|쇼핑몰/.test(query)) industries.push('이커머스');
+  if (/의료|헬스케어|병원|헬스/.test(query)) industries.push('헬스케어');
+  if (/교육|에듀/.test(query)) industries.push('교육');
+  if (/제조|제조업|공장/.test(query)) industries.push('제조');
+  if (/물류|로지스틱스|배송/.test(query)) industries.push('물류');
+  return [...new Set(industries)];
 }
 
-/** embedding 검색 결과가 없을 때 키워드 기반 폴백 검색 (domain, description 텍스트) */
+/** embedding 검색 결과가 없을 때 키워드 기반 폴백 검색 (industry_experience, career_description) */
 async function keywordFallbackSearch(
   supabase: Awaited<ReturnType<typeof createClient>>,
   query: string,
   limit: number = 20
 ) {
-  const domainValues = extractDomainFromQuery(query);
+  const industryValues = extractIndustryFromQuery(query);
   const seenIds = new Set<string>();
   const results: Array<Record<string, unknown> & { match_score?: number }> = [];
 
-  // 1) 도메인으로 검색 (금융 -> finance 등)
-  if (domainValues.length > 0) {
-    for (const domain of domainValues) {
-      const { data: byDomain } = await supabase
+  // 1) 산업군(industry_experience)으로 검색
+  if (industryValues.length > 0) {
+    for (const ind of industryValues) {
+      const { data: byIndustry } = await supabase
         .from('profiles')
         .select('*')
-        .contains('domain', [domain])
+        .contains('industry_experience', [ind])
         .limit(limit);
-      for (const p of byDomain || []) {
+      for (const p of byIndustry || []) {
         if (p?.id && !seenIds.has(p.id)) {
           seenIds.add(p.id);
           results.push({ ...p, match_score: p.match_score ?? 85 });
@@ -41,13 +41,13 @@ async function keywordFallbackSearch(
     }
   }
 
-  // 2) 설명(description)에 검색어 포함된 프로필 추가 (금융, 경험 등)
+  // 2) 경력 기술(career_description)에 검색어 포함된 프로필 추가
   const keywords = query.replace(/\s+/g, ' ').trim().split(/\s/).filter((s) => s.length >= 2);
   for (const kw of keywords.slice(0, 3)) {
     const { data: byDesc } = await supabase
       .from('profiles')
       .select('*')
-      .ilike('description', `%${kw}%`)
+      .ilike('career_description', `%${kw}%`)
       .limit(limit);
     for (const p of byDesc || []) {
       if (p?.id && !seenIds.has(p.id)) {
@@ -142,7 +142,7 @@ export async function POST(request: NextRequest) {
       usedFallback = true;
     }
 
-    // 2) embedding 검색 결과 없음 → 키워드 폴백 (금융권 → domain finance, description 텍스트 검색)
+    // 2) embedding 검색 결과 없음 → 키워드 폴백 (금융권 → industry_experience, career_description 텍스트 검색)
     results = await keywordFallbackSearch(supabase, query, 20);
 
     return NextResponse.json({

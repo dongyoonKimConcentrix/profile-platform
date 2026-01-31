@@ -13,26 +13,19 @@ import type { Database } from "@/lib/supabase/types";
 type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"];
 type CapabilityRow = Database["public"]["Tables"]["profile_capabilities"]["Row"];
 type ProjectRow = Database["public"]["Tables"]["profile_projects"]["Row"];
+type ProjectCareerRow = Database["public"]["Tables"]["profile_project_careers"]["Row"];
 
-const positionLabels: Record<string, string> = {
-  frontend: "프론트엔드 개발자",
-  backend: "백엔드 개발자",
-  fullstack: "풀스택 개발자",
-  mobile: "모바일 개발자",
-  data: "데이터 엔지니어",
-  devops: "DevOps 엔지니어",
+const positionRoleLabels: Record<string, string> = {
+  기획자: "기획자",
+  디자이너: "디자이너",
+  퍼블리셔: "퍼블리셔",
+  프론트엔드개발자: "프론트엔드 개발자",
+  백엔드개발자: "백엔드 개발자",
 };
 
-const experienceLabels: Record<string, string> = {
-  junior: "1-3년",
-  mid: "3-5년",
-  senior: "5-7년",
-  expert: "7년 이상",
-};
-
-const domainLabels: Record<string, string> = {
+const industryLabels: Record<string, string> = {
   finance: "금융",
-  ecommerce: "전자상거래",
+  ecommerce: "이커머스",
   healthcare: "의료",
   education: "교육",
   manufacturing: "제조",
@@ -60,21 +53,11 @@ function mapCapabilities(cap: CapabilityRow | null): {
   };
 }
 
-function mapProjects(rows: ProjectRow[]): {
-  id: string;
-  name: string;
-  role: string;
-  period: string;
-  description: string;
-  technologies: string[];
-}[] {
+/** profile_projects → 재직이력 (industry = 회사명만) */
+function mapToEmploymentHistory(rows: ProjectRow[]): { id: string; company: string }[] {
   return rows.map((p) => ({
     id: p.id,
-    name: p.project_name,
-    role: p.industry,
-    period: p.duration,
-    description: "",
-    technologies: [],
+    company: p.industry || "",
   }));
 }
 
@@ -82,19 +65,18 @@ interface ProfileDetailProps {
   profile: ProfileRow;
   capabilities: CapabilityRow | null;
   projects: ProjectRow[];
+  projectCareers: ProjectCareerRow[];
 }
 
-export function ProfileDetail({ profile, capabilities, projects }: ProfileDetailProps) {
-  const displayName = profile.name;
-  const positionLabel = positionLabels[profile.position] ?? profile.position;
-  const experienceLabel = experienceLabels[profile.experience] ?? profile.experience;
-  const domains = profile.domain ?? [];
-  const domainList = Array.isArray(domains) ? domains : [domains];
+export function ProfileDetail({ profile, capabilities, projects, projectCareers }: ProfileDetailProps) {
+  const displayName = profile.name_ko + (profile.name_en ? ` (${profile.name_en})` : "");
+  const positionLabel = positionRoleLabels[profile.position_role ?? ""] ?? profile.position_role ?? "-";
+  const industries = profile.industry_experience ?? [];
+  const industryList = Array.isArray(industries) ? industries : [industries];
   const caps = mapCapabilities(capabilities);
-  const career: { id: string; company: string; position: string; period: string; description: string; technologies: string[] }[] = [];
-  const projectItems = mapProjects(projects);
+  const employmentHistory = mapToEmploymentHistory(projects);
+  const projectCareerList = projectCareers.map((p) => ({ id: p.id, project_name: p.project_name }));
   const hasCapabilities = Object.values(caps).some((v) => v > 0);
-  const hasCareerOrProjects = career.length > 0 || projectItems.length > 0;
 
   return (
     <div className="space-y-8">
@@ -139,19 +121,44 @@ export function ProfileDetail({ profile, capabilities, projects }: ProfileDetail
                   </span>
                   <Shield className="h-3 w-3 text-muted-foreground ml-auto" aria-label="마스킹 처리됨" />
                 </div>
-                {profile.phone && (
-                  <div className="flex items-center gap-3 text-sm">
-                    <Phone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    <span className="text-muted-foreground">
-                      {profile.phone}
-                    </span>
+                <div className="flex items-center gap-3 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-muted-foreground">
+                    전화번호
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {profile.phone || "-"}
+                  </span>
+                  {profile.phone && (
                     <Shield className="h-3 w-3 text-muted-foreground ml-auto" aria-label="마스킹 처리됨" />
+                  )}
+                </div>
+                {(profile.job_grade || profile.team || profile.education) && (
+                  <div className="space-y-2 text-sm">
+                    {profile.job_grade && (
+                      <div>
+                        <span className="text-muted-foreground">직급 </span>
+                        <span className="font-semibold text-foreground">{profile.job_grade}</span>
+                      </div>
+                    )}
+                    {profile.team && (
+                      <div>
+                        <span className="text-muted-foreground">소속 </span>
+                        <span className="font-semibold text-foreground">{profile.team}</span>
+                      </div>
+                    )}
+                    {(profile.education_school || profile.education) && (
+                      <div>
+                        <span className="text-muted-foreground">학력 </span>
+                        <span className="font-semibold text-foreground">
+                          {profile.education_school && profile.education
+                            ? `${profile.education_school}(${profile.education})`
+                            : profile.education_school || profile.education || "-"}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
-                <div className="flex items-center gap-3 text-sm">
-                  <Calendar className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span>경력 {experienceLabel}</span>
-                </div>
               </div>
 
               <div className="pt-4 border-t">
@@ -170,16 +177,16 @@ export function ProfileDetail({ profile, capabilities, projects }: ProfileDetail
               </div>
 
               <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-2">도메인 경험</p>
+                <p className="text-sm font-medium mb-2">산업군 경험</p>
                 <div className="flex flex-wrap gap-2">
-                  {domainList.length > 0 ? (
-                    domainList.map((d) => (
+                  {industryList.length > 0 ? (
+                    industryList.map((d) => (
                       <Badge key={d} variant="outline">
-                        {domainLabels[d] ?? d}
+                        {industryLabels[d] ?? d}
                       </Badge>
                     ))
                   ) : (
-                    <span className="text-sm text-muted-foreground">등록된 도메인 없음</span>
+                    <span className="text-sm text-muted-foreground">등록된 산업군 없음</span>
                   )}
                 </div>
               </div>
@@ -202,33 +209,21 @@ export function ProfileDetail({ profile, capabilities, projects }: ProfileDetail
         </div>
 
         <div className="lg:col-span-2 space-y-6">
-          {hasCareerOrProjects ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>경력 기술서</CardTitle>
-                <CardDescription>
-                  상세한 경력 및 프로젝트 이력
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CareerTimeline career={career} projects={projectItems} />
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>경력 기술서</CardTitle>
-                <CardDescription>
-                  상세한 경력 및 프로젝트 이력
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground py-4">
-                  등록된 경력·프로젝트 이력이 없습니다.
-                </p>
-              </CardContent>
-            </Card>
-          )}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-xl sm:text-2xl">경력 기술서</CardTitle>
+              <CardDescription className="text-base">
+                재직이력 및 경력 기술서 (프로젝트 경력)
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CareerTimeline
+                employmentHistory={employmentHistory}
+                projectCareers={projectCareerList}
+                careerDescription={profile.career_description ?? null}
+              />
+            </CardContent>
+          </Card>
         </div>
       </div>
     </div>

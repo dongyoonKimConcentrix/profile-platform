@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 
 interface Filters {
-  position: string;
+  job_grade: string;
+  education: string;
+  position_role: string;
+  industry_experience: string;
   skills: string[];
-  experience: string;
-  domain: string;
 }
 
 interface AdvancedFiltersProps {
@@ -25,8 +26,7 @@ export function AdvancedFilters({
   onFiltersChange,
   onSearch,
 }: AdvancedFiltersProps) {
-  // skillsInput을 완전히 독립적으로 관리 (초기값만 filters에서 가져옴)
-  const [skillsInput, setSkillsInput] = useState(() => 
+  const [skillsInput, setSkillsInput] = useState(() =>
     filters.skills.length > 0 ? filters.skills.join(", ") : ""
   );
 
@@ -35,14 +35,11 @@ export function AdvancedFilters({
   };
 
   const handleSkillsChange = (value: string) => {
-    // 입력값을 그대로 유지 (쉼표 포함)
     setSkillsInput(value);
-    // 배열로 변환하여 저장 (검색 시 사용)
     const skillsArray = value
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
-    // skills 배열만 업데이트
     onFiltersChange({ ...filters, skills: skillsArray });
   };
 
@@ -50,64 +47,85 @@ export function AdvancedFilters({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="position">직무</Label>
+          <Label htmlFor="job_grade">직급</Label>
           <Select
-            value={filters.position}
-            onValueChange={(value) => updateFilter("position", value)}
+            value={filters.job_grade}
+            onValueChange={(value) => updateFilter("job_grade", value)}
           >
-            <SelectTrigger id="position" aria-label="직무 선택" className="w-full">
+            <SelectTrigger id="job_grade" aria-label="직급 선택" className="w-full">
+              <SelectValue placeholder="직급을 선택하세요" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="사원">사원</SelectItem>
+              <SelectItem value="대리">대리</SelectItem>
+              <SelectItem value="과장">과장</SelectItem>
+              <SelectItem value="차장">차장</SelectItem>
+              <SelectItem value="부장">부장</SelectItem>
+              <SelectItem value="실장">실장</SelectItem>
+              <SelectItem value="이사">이사</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="education">최종학력</Label>
+          <Select
+            value={filters.education}
+            onValueChange={(value) => updateFilter("education", value)}
+          >
+            <SelectTrigger id="education" aria-label="최종학력 선택" className="w-full">
+              <SelectValue placeholder="최종학력을 선택하세요" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="고졸">고졸</SelectItem>
+              <SelectItem value="전문학사">전문학사</SelectItem>
+              <SelectItem value="학사">학사</SelectItem>
+              <SelectItem value="석사">석사</SelectItem>
+              <SelectItem value="박사">박사</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="position_role">직무</Label>
+          <Select
+            value={filters.position_role}
+            onValueChange={(value) => updateFilter("position_role", value)}
+          >
+            <SelectTrigger id="position_role" aria-label="직무 선택" className="w-full">
               <SelectValue placeholder="직무를 선택하세요" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="frontend">프론트엔드 개발자</SelectItem>
-              <SelectItem value="backend">백엔드 개발자</SelectItem>
-              <SelectItem value="fullstack">풀스택 개발자</SelectItem>
-              <SelectItem value="mobile">모바일 개발자</SelectItem>
-              <SelectItem value="data">데이터 엔지니어</SelectItem>
-              <SelectItem value="devops">DevOps 엔지니어</SelectItem>
+              <SelectItem value="기획자">기획자</SelectItem>
+              <SelectItem value="디자이너">디자이너</SelectItem>
+              <SelectItem value="퍼블리셔">퍼블리셔</SelectItem>
+              <SelectItem value="프론트엔드개발자">프론트엔드 개발자</SelectItem>
+              <SelectItem value="백엔드개발자">백엔드 개발자</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="experience">경력</Label>
+          <Label htmlFor="industry_experience">산업군 경험</Label>
           <Select
-            value={filters.experience}
-            onValueChange={(value) => updateFilter("experience", value)}
+            value={filters.industry_experience}
+            onValueChange={(value) => updateFilter("industry_experience", value)}
           >
-            <SelectTrigger id="experience" aria-label="경력 선택" className="w-full">
-              <SelectValue placeholder="경력을 선택하세요" />
+            <SelectTrigger id="industry_experience" aria-label="산업군 선택" className="w-full">
+              <SelectValue placeholder="산업군을 선택하세요" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="junior">1-3년</SelectItem>
-              <SelectItem value="mid">3-5년</SelectItem>
-              <SelectItem value="senior">5-7년</SelectItem>
-              <SelectItem value="expert">7년 이상</SelectItem>
+              <SelectItem value="금융">금융</SelectItem>
+              <SelectItem value="이커머스">이커머스</SelectItem>
+              <SelectItem value="헬스케어">헬스케어</SelectItem>
+              <SelectItem value="교육">교육</SelectItem>
+              <SelectItem value="제조">제조</SelectItem>
+              <SelectItem value="물류">물류</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="domain">도메인 경험</Label>
-          <Select
-            value={filters.domain}
-            onValueChange={(value) => updateFilter("domain", value)}
-          >
-            <SelectTrigger id="domain" aria-label="도메인 선택" className="w-full">
-              <SelectValue placeholder="도메인을 선택하세요" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="finance">금융</SelectItem>
-              <SelectItem value="ecommerce">전자상거래</SelectItem>
-              <SelectItem value="healthcare">의료</SelectItem>
-              <SelectItem value="education">교육</SelectItem>
-              <SelectItem value="manufacturing">제조</SelectItem>
-              <SelectItem value="logistics">물류</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
+        <div className="space-y-2 sm:col-span-2">
           <Label htmlFor="skills">기술 스택 (쉼표로 구분)</Label>
           <Input
             id="skills"

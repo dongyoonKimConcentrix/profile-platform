@@ -19,10 +19,11 @@ export function SearchInterface({ onSearchResults }: SearchInterfaceProps) {
   const [searchMode, setSearchMode] = useState<"natural" | "filter">("natural");
   const [naturalQuery, setNaturalQuery] = useState("");
   const [filters, setFilters] = useState({
-    position: "",
+    job_grade: "",
+    education: "",
+    position_role: "",
+    industry_experience: "",
     skills: [] as string[],
-    experience: "",
-    domain: "",
   });
   const [isLoading, setIsLoading] = useState(false);
 

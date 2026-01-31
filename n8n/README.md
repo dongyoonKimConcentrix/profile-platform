@@ -170,10 +170,13 @@ N8N_ENCRYPTION_KEY=your-encryption-key
 - API 사용량 한도 확인
 - 프롬프트 형식 확인
 
-### Supabase 저장 실패
-- Supabase Credentials 확인
-- RLS 정책 확인 (Service Role Key 사용 시 RLS 우회)
-- 테이블 스키마 확인
+### Supabase 저장 실패 / 데이터가 DB에 없음
+- **반드시 Service Role Secret 사용**: n8n Supabase 자격 증명에 **anon(public) 키가 아닌 Service Role Secret**을 넣어야 합니다.  
+  - Supabase 대시보드 → Settings → API → **service_role** (secret) 복사  
+  - anon 키를 쓰면 RLS 때문에 `profiles`, `profile_projects`, `profile_project_careers` INSERT가 모두 차단되어 **어떤 데이터도 저장되지 않습니다.**
+- Credentials에서 **Host**, **Service Role Secret**, **Schema: public** 확인
+- 마이그레이션 적용 여부: `008_profile_project_careers.sql` 등 실행해 `profile_project_careers` 테이블 존재 확인
+- n8n 실행 로그에서 Insert 노드(Insert 재직이력, Insert 프로젝트 경력) 에러 메시지 확인
 
 ## 참고 자료
 

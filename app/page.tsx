@@ -2,21 +2,19 @@ import { MainLayout } from "@/components/layout/main-layout";
 import { DashboardStats } from "@/components/dashboard/dashboard-stats";
 import { RecentUpdates } from "@/components/dashboard/recent-updates";
 import { ProjectMatchingSummary } from "@/components/dashboard/project-matching-summary";
+import { DashboardBlurMask } from "@/components/dashboard/dashboard-blur-mask";
 import { createClient } from "@/lib/supabase/server";
 import { createServerAdminClient } from "@/lib/supabase/server-admin";
 
-const DOMAIN_LABELS: Record<string, string> = {
-  finance: "금융",
-  ecommerce: "전자상거래",
-  healthcare: "의료",
-  education: "교육",
-  manufacturing: "제조",
-  logistics: "물류",
-};
+// industry_experience는 DB에 한글 저장 (금융, 이커머스 등) — 라벨은 그대로 사용
 
 export default async function Home() {
+  const anonSupabase = await createClient();
+  const { data: { user } } = await anonSupabase.auth.getUser();
+  const isLoggedIn = !!user;
+
   const adminClient = createServerAdminClient();
-  const supabase = adminClient ?? (await createClient());
+  const supabase = adminClient ?? anonSupabase;
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -34,24 +32,24 @@ export default async function Home() {
       .gte("created_at", startOfMonth),
     supabase
       .from("profiles")
-      .select("id, name, position, skills, updated_at, match_score")
+      .select("id, name_ko, position_role, skills, updated_at, match_score")
       .order("updated_at", { ascending: false })
       .limit(4),
-    supabase.from("profiles").select("domain"),
+    supabase.from("profiles").select("industry_experience"),
   ]);
 
   const domainStats: { domain: string; label: string; count: number }[] = [];
-  const domainCounts: Record<string, number> = {};
+  const industryCounts: Record<string, number> = {};
   if (allProfiles) {
-    for (const row of allProfiles as { domain?: string[] | null }[]) {
-      const domains = row.domain ?? [];
-      const list = Array.isArray(domains) ? domains : [domains];
+    for (const row of allProfiles as { industry_experience?: string[] | null }[]) {
+      const industries = row.industry_experience ?? [];
+      const list = Array.isArray(industries) ? industries : [industries];
       for (const d of list) {
-        domainCounts[d] = (domainCounts[d] ?? 0) + 1;
+        industryCounts[d] = (industryCounts[d] ?? 0) + 1;
       }
     }
-    for (const [domain, count] of Object.entries(domainCounts)) {
-      domainStats.push({ domain, label: DOMAIN_LABELS[domain] ?? domain, count });
+    for (const [domain, count] of Object.entries(industryCounts)) {
+      domainStats.push({ domain, label: domain, count });
     }
     domainStats.sort((a, b) => b.count - a.count);
   }
@@ -77,16 +75,18 @@ export default async function Home() {
           </p>
         </div>
 
-        <DashboardStats
-          totalCount={total}
-          newThisMonth={newCount}
-          trendNew={trendNew}
-        />
+        <DashboardBlurMask isLoggedIn={isLoggedIn}>
+          <DashboardStats
+            totalCount={total}
+            newThisMonth={newCount}
+            trendNew={trendNew}
+          />
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <RecentUpdates recentProfiles={recentProfiles ?? []} />
-          <ProjectMatchingSummary domainStats={domainStats} />
-        </div>
+          <div className="grid gap-6 md:grid-cols-2 mt-6">
+            <RecentUpdates recentProfiles={recentProfiles ?? []} />
+            <ProjectMatchingSummary domainStats={domainStats} />
+          </div>
+        </DashboardBlurMask>
       </div>
     </MainLayout>
   );

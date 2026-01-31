@@ -6,13 +6,12 @@ import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import Link from "next/link";
 
-const positionLabels: Record<string, string> = {
-  frontend: "프론트엔드 개발자",
-  backend: "백엔드 개발자",
-  fullstack: "풀스택 개발자",
-  mobile: "모바일 개발자",
-  data: "데이터 엔지니어",
-  devops: "DevOps 엔지니어",
+const positionRoleLabels: Record<string, string> = {
+  기획자: "기획자",
+  디자이너: "디자이너",
+  퍼블리셔: "퍼블리셔",
+  프론트엔드개발자: "프론트엔드 개발자",
+  백엔드개발자: "백엔드 개발자",
 };
 
 function formatRelativeTime(dateStr: string): string {
@@ -30,8 +29,8 @@ function formatRelativeTime(dateStr: string): string {
 
 interface RecentProfile {
   id: string;
-  name: string;
-  position: string;
+  name_ko: string;
+  position_role: string | null;
   skills: string[];
   updated_at: string;
   match_score: number;
@@ -60,20 +59,20 @@ export function RecentUpdates({ recentProfiles }: RecentUpdatesProps) {
               key={profile.id}
               href={`/profile/${profile.id}`}
               className="block p-4 rounded-lg border hover:bg-accent transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-              aria-label={`${profile.name} 프로필 보기`}
+              aria-label={`${profile.name_ko} 프로필 보기`}
             >
               <div className="flex items-start gap-4">
                 <Avatar>
                   <AvatarFallback>
-                    {profile.name.charAt(0)}
+                    {profile.name_ko.charAt(0)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-1">
-                    <h3 className="font-semibold truncate">{profile.name}</h3>
+                    <h3 className="font-semibold truncate">{profile.name_ko}</h3>
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">
-                    {positionLabels[profile.position] ?? profile.position}
+                    {positionRoleLabels[profile.position_role ?? ""] ?? profile.position_role ?? "-"}
                   </p>
                   <div className="flex flex-wrap gap-1 mb-2">
                     {(profile.skills ?? []).slice(0, 5).map((skill) => (

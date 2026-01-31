@@ -9,14 +9,18 @@ import Link from "next/link";
 
 interface Profile {
   id: string;
-  name: string;
+  name_ko: string;
+  name_en: string | null;
   email: string;
   phone: string | null;
-  position: 'frontend' | 'backend' | 'fullstack' | 'mobile' | 'data' | 'devops';
-  experience: 'junior' | 'mid' | 'senior' | 'expert';
-  domain: ('finance' | 'ecommerce' | 'healthcare' | 'education' | 'manufacturing' | 'logistics')[] | null;
+  job_grade: string | null;
+  team: string | null;
+  education_school: string | null;
+  education: string | null;
+  position_role: string | null;
+  industry_experience: string[] | null;
   skills: string[];
-  description: string | null;
+  career_description: string | null;
   match_score: number;
 }
 
@@ -26,29 +30,12 @@ interface SearchResultsProps {
   error: string | null;
 }
 
-const positionLabels: Record<string, string> = {
-  frontend: "프론트엔드 개발자",
-  backend: "백엔드 개발자",
-  fullstack: "풀스택 개발자",
-  mobile: "모바일 개발자",
-  data: "데이터 엔지니어",
-  devops: "DevOps 엔지니어",
-};
-
-const experienceLabels: Record<string, string> = {
-  junior: "1-3년",
-  mid: "3-5년",
-  senior: "5-7년",
-  expert: "7년 이상",
-};
-
-const domainLabels: Record<string, string> = {
-  finance: "금융",
-  ecommerce: "전자상거래",
-  healthcare: "의료",
-  education: "교육",
-  manufacturing: "제조",
-  logistics: "물류",
+const positionRoleLabels: Record<string, string> = {
+  기획자: "기획자",
+  디자이너: "디자이너",
+  퍼블리셔: "퍼블리셔",
+  프론트엔드개발자: "프론트엔드 개발자",
+  백엔드개발자: "백엔드 개발자",
 };
 
 export function SearchResults({ results, loading, error }: SearchResultsProps) {
@@ -109,17 +96,21 @@ export function SearchResults({ results, loading, error }: SearchResultsProps) {
                   <div className="flex items-start gap-4 mb-6">
                     <Avatar className="h-16 w-16 border border-slate-200">
                       <AvatarFallback className="text-lg bg-indigo-100 text-indigo-700">
-                        {result.name.charAt(0)}
+                        {(result.name_ko || result.name_en || "?").charAt(0)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2 mb-2">
                         <div>
                           <h3 className="text-xl font-bold text-slate-800 mb-1">
-                            {result.name}
+                            {result.name_ko}
+                            {result.name_en && (
+                              <span className="text-slate-500 font-normal ml-1">({result.name_en})</span>
+                            )}
                           </h3>
                           <p className="text-sm text-slate-600 mb-2">
-                            {positionLabels[result.position] || result.position} · {experienceLabels[result.experience] || result.experience}
+                            {positionRoleLabels[result.position_role ?? ""] || result.position_role || "-"}
+                            {result.job_grade && ` · ${result.job_grade}`}
                           </p>
                           {result.email && (
                             <p className="text-xs text-slate-500">{result.email}</p>
@@ -138,14 +129,14 @@ export function SearchResults({ results, loading, error }: SearchResultsProps) {
                     </div>
                   </div>
                   
-                  {/* 도메인 경험 */}
-                  {result.domain && result.domain.length > 0 && (
+                  {/* 산업군 경험 */}
+                  {result.industry_experience && result.industry_experience.length > 0 && (
                     <div className="mb-4">
-                      <h4 className="text-sm font-semibold text-slate-700 mb-2">도메인 경험</h4>
+                      <h4 className="text-sm font-semibold text-slate-700 mb-2">산업군 경험</h4>
                       <div className="flex flex-wrap gap-2">
-                        {result.domain.map((d) => (
+                        {result.industry_experience.map((d) => (
                           <Badge key={d} variant="outline" className="text-xs">
-                            {domainLabels[d] || d}
+                            {d}
                           </Badge>
                         ))}
                       </div>
@@ -155,13 +146,13 @@ export function SearchResults({ results, loading, error }: SearchResultsProps) {
 
                 {/* 우측: 상세 정보 */}
                 <div className="space-y-6">
-                  {/* 설명 */}
-                  {result.description && (
+                  {/* 경력 기술 */}
+                  {result.career_description && (
                     <Card className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 shadow-sm">
                       <CardContent className="p-0">
-                        <h4 className="font-bold text-indigo-900 mb-2">프로필 설명</h4>
+                        <h4 className="font-bold text-indigo-900 mb-2">경력 기술</h4>
                         <p className="text-sm text-indigo-800 leading-relaxed">
-                          {result.description}
+                          {result.career_description}
                         </p>
                       </CardContent>
                     </Card>

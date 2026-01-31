@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# n8n 테스트 샘플 (대용량/개인정보 제외)
+n8n/test-samples/주요인력프로필_김콘센.pptx

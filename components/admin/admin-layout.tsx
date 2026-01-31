@@ -5,12 +5,13 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Users, UserPlus, List, LogOut, Shield, Loader2 } from "lucide-react";
+import { UserPlus, List, LogOut, Shield, Loader2, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const adminNavigation = [
   { name: "인력 목록", href: "/admin", icon: List },
   { name: "인력 등록", href: "/admin/profiles/new", icon: UserPlus },
+  { name: "사용자 계정 생성", href: "/admin/users/new", icon: UserCog },
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {

@@ -50,9 +50,22 @@ export async function updateSession(request: NextRequest) {
       .eq('user_id', user.id)
       .single()
     
-    if (!profile || profile.role !== 'admin') {
+    if (!profile || (profile.role !== 'admin' && profile.role !== 'super_admin')) {
       const url = request.nextUrl.clone()
       url.pathname = '/admin/login'
+      return NextResponse.redirect(url)
+    }
+  }
+
+  // 사용자 화면: 인력 검색/목록/상세는 로그인 필수
+  const pathname = request.nextUrl.pathname
+  const userOnlyPaths = ['/search', '/list']
+  const isProfileDetail = /^\/profile\/[^/]+\/?$/.test(pathname)
+  if (!user) {
+    if (userOnlyPaths.includes(pathname) || isProfileDetail) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/login'
+      url.searchParams.set('from', pathname)
       return NextResponse.redirect(url)
     }
   }

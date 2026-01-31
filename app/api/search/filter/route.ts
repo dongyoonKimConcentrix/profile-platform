@@ -4,29 +4,33 @@ import { createServerAdminClient } from '@/lib/supabase/server-admin';
 
 export async function POST(request: NextRequest) {
   try {
-    const { position, skills, experience, domain } = await request.json();
+    const { job_grade, education, position_role, industry_experience, skills } =
+      await request.json();
 
     const adminClient = createServerAdminClient();
     const supabase = adminClient ?? (await createClient());
     let query = supabase.from('profiles').select('*');
 
-    // 필터 적용
-    if (position && position.trim() !== '') {
-      query = query.eq('position', position);
+    // 필터 적용 (새 스키마: job_grade, education, position_role, industry_experience, skills)
+    if (job_grade && String(job_grade).trim() !== '') {
+      query = query.eq('job_grade', job_grade);
     }
 
-    if (experience && experience.trim() !== '') {
-      query = query.eq('experience', experience);
+    if (education && String(education).trim() !== '') {
+      query = query.eq('education', education);
     }
 
-    if (domain && domain.trim() !== '') {
-      // domain은 배열이므로 contains 연산자 사용
-      query = query.contains('domain', [domain]);
+    if (position_role && String(position_role).trim() !== '') {
+      query = query.eq('position_role', position_role);
+    }
+
+    if (industry_experience && Array.isArray(industry_experience) && industry_experience.length > 0) {
+      query = query.overlaps('industry_experience', industry_experience);
+    } else if (industry_experience && typeof industry_experience === 'string' && industry_experience.trim() !== '') {
+      query = query.contains('industry_experience', [industry_experience]);
     }
 
     if (skills && Array.isArray(skills) && skills.length > 0) {
-      // skills 배열 중 하나라도 포함하는 프로필 검색
-      // Supabase에서는 배열 필드에 대해 overlaps 연산자 사용
       query = query.overlaps('skills', skills);
     }
 

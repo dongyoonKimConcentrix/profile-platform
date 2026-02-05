@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TrendingUp, Briefcase, Loader2, AlertCircle } from "lucide-react";
@@ -94,7 +94,10 @@ export function SearchResults({ results, loading, error }: SearchResultsProps) {
                 {/* 좌측: 기본 정보 */}
                 <div className="bg-white p-6 rounded-xl shadow-md border border-slate-100">
                   <div className="flex items-start gap-4 mb-6">
-                    <Avatar className="h-16 w-16 border border-slate-200">
+                    <Avatar className="h-16 w-16 border border-slate-200 shrink-0">
+                      {result.photo_url && (
+                        <AvatarImage src={result.photo_url} alt="" className="object-cover" />
+                      )}
                       <AvatarFallback className="text-lg bg-indigo-100 text-indigo-700">
                         {(result.name_ko || result.name_en || "?").charAt(0)}
                       </AvatarFallback>

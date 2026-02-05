@@ -32,7 +32,7 @@ export default async function Home() {
       .gte("created_at", startOfMonth),
     supabase
       .from("profiles")
-      .select("id, name_ko, position_role, skills, updated_at, match_score")
+      .select("id, name_ko, position_role, skills, updated_at, match_score, photo_url")
       .order("updated_at", { ascending: false })
       .limit(4),
     supabase.from("profiles").select("industry_experience"),

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Save, ArrowLeft, Loader2, X, Upload, FileText, FileInput, PenLine } from "lucide-react";
 import Link from "next/link";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface ProfileFormProps {
   profileId?: string;
@@ -28,6 +29,7 @@ export function ProfileForm({ profileId }: ProfileFormProps) {
     name_en: "",
     email: "",
     phone: "",
+    photo_url: "" as string | null,
     job_grade: "",
     team: "",
     education_school: "",
@@ -46,14 +48,20 @@ export function ProfileForm({ profileId }: ProfileFormProps) {
       const fetchProfile = async () => {
         try {
           const supabase = createClient();
-          const [{ data, error }, { data: projects }, { data: careers }] = await Promise.all([
+          const [
+            { data, error: profileError },
+            { data: projects, error: projectsError },
+            { data: careers, error: careersError },
+          ] = await Promise.all([
             supabase.from("profiles").select("*").eq("id", profileId).single(),
             supabase.from("profile_projects").select("industry").eq("profile_id", profileId).order("created_at", { ascending: false }),
             supabase.from("profile_project_careers").select("project_name").eq("profile_id", profileId).order("created_at", { ascending: false }),
           ]);
 
-          if (error) {
-            console.error("Error fetching profile:", error);
+          const err = profileError ?? projectsError ?? careersError;
+          if (err) {
+            const msg = (err as { message?: string }).message ?? (err as { code?: string }).code ?? String(err);
+            console.error("Error fetching profile:", msg, err);
             setError("프로필을 불러오는 중 오류가 발생했습니다.");
             setLoading(false);
             return;
@@ -65,6 +73,7 @@ export function ProfileForm({ profileId }: ProfileFormProps) {
               name_en: data.name_en || "",
               email: data.email || "",
               phone: data.phone || "",
+              photo_url: (data as { photo_url?: string | null }).photo_url ?? "",
               job_grade: data.job_grade || "",
               team: data.team || "",
               education_school: data.education_school || "",
@@ -81,7 +90,8 @@ export function ProfileForm({ profileId }: ProfileFormProps) {
             setProjectCareers(careers.map((c) => ({ project_name: (c as { project_name: string }).project_name || "" })));
           }
         } catch (err) {
-          console.error("Error:", err);
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("Error fetching profile:", msg, err);
           setError("프로필을 불러오는 중 오류가 발생했습니다.");
         } finally {
           setLoading(false);
@@ -131,6 +141,7 @@ export function ProfileForm({ profileId }: ProfileFormProps) {
         name_en: formData.name_en.trim() || null,
         email: formData.email,
         phone: formData.phone || null,
+        photo_url: formData.photo_url?.trim() || null,
         job_grade: formData.job_grade || null,
         team: formData.team.trim() || null,
         education_school: formData.education_school.trim() || null,
@@ -394,6 +405,26 @@ export function ProfileForm({ profileId }: ProfileFormProps) {
       {/* 수정 모드이거나, 신규 등록 시 '직접 입력으로 등록' 탭일 때만 폼 필드 표시 */}
       {(isEdit || activeTab === "form") && (
       <>
+      {/* 프로필 사진 영역 (수정 시 표시) */}
+      {isEdit && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="text-base font-medium text-muted-foreground">
+              프로필 사진
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex justify-center pb-6">
+            <Avatar className="h-28 w-28 ring-2 ring-muted" aria-hidden="true">
+              {formData.photo_url ? (
+                <AvatarImage src={formData.photo_url} alt="" className="object-cover" />
+              ) : null}
+              <AvatarFallback className="text-3xl bg-muted text-muted-foreground">
+                {(formData.name_ko || "?").charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+          </CardContent>
+        </Card>
+      )}
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>

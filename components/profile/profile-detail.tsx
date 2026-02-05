@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Shield, Mail, Phone, Calendar } from "lucide-react";
@@ -96,13 +96,32 @@ export function ProfileDetail({ profile, capabilities, projects, projectCareers 
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-1 space-y-6">
+          {/* 프로필 사진 영역 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base font-medium text-muted-foreground">
+                프로필 사진
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center pb-6">
+              <Avatar className="h-32 w-32 sm:h-40 sm:w-40 ring-2 ring-muted" aria-hidden="true">
+                {profile.photo_url && (
+                  <AvatarImage src={profile.photo_url} alt="" className="object-cover" />
+                )}
+                <AvatarFallback className="text-4xl sm:text-5xl bg-muted text-muted-foreground">
+                  {displayName.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
+            </CardContent>
+          </Card>
           <Card>
             <CardHeader>
               <div className="flex items-center gap-4">
-                <Avatar className="h-20 w-20">
-                  <AvatarFallback className="text-2xl">
-                    {displayName.charAt(0)}
-                  </AvatarFallback>
+                <Avatar className="h-12 w-12 shrink-0 md:hidden" aria-hidden="true">
+                  {profile.photo_url && (
+                    <AvatarImage src={profile.photo_url} alt="" className="object-cover" />
+                  )}
+                  <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <CardTitle className="text-xl">{displayName}</CardTitle>

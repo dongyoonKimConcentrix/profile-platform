@@ -88,6 +88,46 @@ function extractTextFromPptx(filePath) {
   return parts.join('\n\n');
 }
 
+const IMAGE_EXT_MIME = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+};
+
+/**
+ * ZIP 기반 파일(PPTX, DOCX)에서 첫 번째 이미지 추출
+ * @param {string} filePath - 파일 경로
+ * @param {string} mediaPrefix - 미디어 폴더 prefix (ppt/media/ 또는 word/media/)
+ * @returns {{ base64: string, mimeType: string } | null}
+ */
+function extractFirstImageFromZip(filePath, mediaPrefix) {
+  try {
+    const zip = new AdmZip(filePath);
+    const entries = zip.getEntries();
+    const imageEntries = entries
+      .filter((e) => {
+        if (!e.entryName.startsWith(mediaPrefix)) return false;
+        const ext = path.extname(e.entryName).toLowerCase().replace('.', '');
+        return IMAGE_EXT_MIME[ext];
+      })
+      .sort((a, b) => a.entryName.localeCompare(b.entryName));
+
+    if (imageEntries.length === 0) return null;
+    const entry = imageEntries[0];
+    const ext = path.extname(entry.entryName).toLowerCase().replace('.', '');
+    const mimeType = IMAGE_EXT_MIME[ext] || 'image/png';
+    const buffer = entry.getData();
+    const base64 = buffer.toString('base64');
+    return { base64, mimeType };
+  } catch (err) {
+    console.error('extractFirstImageFromZip error:', err);
+    return null;
+  }
+}
+
 app.post('/parse', upload.single('file'), async (req, res) => {
   let filePath = null;
   
@@ -140,16 +180,41 @@ app.post('/parse', upload.single('file'), async (req, res) => {
       });
     }
 
+    // PPTX/DOCX에서 첫 번째 이미지 추출 (인력 프로필 사진 등)
+    let imageBase64 = null;
+    let imageMimeType = null;
+    if (filePath && fs.existsSync(filePath)) {
+      if (fileType === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' ||
+          fileType === 'application/vnd.ms-powerpoint') {
+        const img = extractFirstImageFromZip(filePath, 'ppt/media/');
+        if (img) {
+          imageBase64 = img.base64;
+          imageMimeType = img.mimeType;
+        }
+      } else if (fileType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+        const img = extractFirstImageFromZip(filePath, 'word/media/');
+        if (img) {
+          imageBase64 = img.base64;
+          imageMimeType = img.mimeType;
+        }
+      }
+    }
+
     // 임시 파일 삭제
     if (filePath && fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
 
-    res.json({ 
+    const payload = { 
       text: text.trim(),
       fileName: fileName,
       fileType: fileType
-    });
+    };
+    if (imageBase64) {
+      payload.imageBase64 = imageBase64;
+      payload.imageMimeType = imageMimeType || 'image/png';
+    }
+    res.json(payload);
 
   } catch (error) {
     console.error('Parsing error:', error);

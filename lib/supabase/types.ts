@@ -31,6 +31,7 @@ export type Database = {
           name_en: string | null
           email: string
           phone: string | null
+          photo_url: string | null
           job_grade: '사원' | '대리' | '과장' | '차장' | '부장' | '실장' | '이사' | null
           team: string | null
           education_school: string | null
@@ -50,6 +51,7 @@ export type Database = {
           name_en?: string | null
           email: string
           phone?: string | null
+          photo_url?: string | null
           job_grade?: '사원' | '대리' | '과장' | '차장' | '부장' | '실장' | '이사' | null
           team?: string | null
           education_school?: string | null
@@ -69,6 +71,7 @@ export type Database = {
           name_en?: string | null
           email?: string
           phone?: string | null
+          photo_url?: string | null
           job_grade?: '사원' | '대리' | '과장' | '차장' | '부장' | '실장' | '이사' | null
           team?: string | null
           education_school?: string | null

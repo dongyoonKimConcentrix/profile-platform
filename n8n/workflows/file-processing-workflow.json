@@ -156,6 +156,22 @@
             {
               "name": "text",
               "stringValue": "={{ $json.text }}"
+            },
+            {
+              "name": "imageBase64",
+              "stringValue": "={{ $json.imageBase64 || '' }}"
+            },
+            {
+              "name": "imageMimeType",
+              "stringValue": "={{ $json.imageMimeType || 'image/png' }}"
+            },
+            {
+              "name": "_appUrl",
+              "stringValue": "http://localhost:3000"
+            },
+            {
+              "name": "_secret",
+              "stringValue": ""
             }
           ]
         },
@@ -169,6 +185,59 @@
         9920,
         2736
       ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($json._appUrl || '').toString().replace(/\\/$/, '') }}/api/n8n/upload-avatar",
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "image",
+              "value": "={{ $json.imageBase64 || '' }}"
+            },
+            {
+              "name": "mimeType",
+              "value": "={{ $json.imageMimeType || 'image/png' }}"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-n8n-avatar-secret",
+              "value": "={{ $json._secret || '' }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "text",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "upload-image-node-001",
+      "name": "Upload Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [9920, 2840]
+    },
+    {
+      "parameters": {
+        "jsCode": "// HTTP Request 응답(Text)을 Merge With Photo 형식으로 매핑. JSON이 아니어도 파싱 시도.\nconst item = $input.first();\nconst j = (item && item.json) ? item.json : {};\nlet body = j.body != null ? j.body : (j.data != null ? j.data : j);\nif (typeof body === 'string') {\n  const raw = body;\n  try { body = JSON.parse(body); } catch (_) {\n    const isHtml = /^\\s*<(!DOCTYPE|html|\\?xml)/i.test(raw);\n    body = { error: isHtml ? 'Server error (HTML response, status ' + (j.statusCode || '') + ')' : (raw.length > 200 ? raw.slice(0, 200) + '...' : raw) };\n  }\n}\nif (body && typeof body !== 'object') body = {};\nconst photo_url = (body && body.url) ? body.url : null;\nconst _uploadError = (body && body.error) ? body.error : null;\nconst _uploadStatus = j.statusCode != null ? j.statusCode : (item.statusCode != null ? item.statusCode : null);\nreturn [{ json: { photo_url, _uploadError, _uploadStatus } }];"
+      },
+      "id": "normalize-upload-001",
+      "name": "Normalize Upload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [10020, 2840]
     },
     {
       "parameters": {
@@ -206,7 +275,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// 1. 입력 데이터 가져오기\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리될 수 있으므로,\n// 실행 컨텍스트를 활용하여 두 입력을 모두 받도록 처리\nconst allData = $input.all();\n\n// 디버그: 입력 개수 확인\nconsole.log('Prepare Supabase Data - 입력 개수:', allData.length);\nconsole.log('Prepare Supabase Data - 실행 ID:', $execution.id);\n\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로,\n// 두 입력이 모두 있는지 확인하고, 하나만 있으면 에러 발생\n// (실제로는 n8n이 자동으로 두 입력을 합쳐주지만, 확인용)\nif (allData.length < 2) {\n  console.log('경고: 입력이 2개 미만입니다. 병렬 실행이 완료되지 않았을 수 있습니다.');\n  console.log('입력 데이터:', JSON.stringify(allData.map(item => ({ keys: Object.keys(item?.json || {}).slice(0, 5) }))));\n}\n\n// 2. 입력 데이터 자동 판단 (순서에 상관없이)\nlet aiJson = null;\nlet embedJson = null;\n\nfor (let i = 0; i < allData.length; i++) {\n  const item = allData[i];\n  const json = item?.json || item;\n  \n  if (!json) continue;\n  \n  // 디버그: 각 입력의 키 확인\n  if (json && typeof json === 'object') {\n    const keys = Object.keys(json).slice(0, 10);\n    console.log(`입력[${i}] 키:`, keys.join(', '));\n  }\n  \n  // Merge 노드에서 합쳐진 데이터 확인\n  if (json.aiResponse) {\n    aiJson = json.aiResponse;\n    console.log('AI 응답 데이터 발견: aiResponse 필드');\n  }\n  if (json.embeddingResponse) {\n    embedJson = json.embeddingResponse;\n    console.log('Embedding 응답 데이터 발견: embeddingResponse 필드');\n  }\n  \n  // Embedding 데이터 확인 (먼저 확인 - object: 'list' 형식)\n  if (!embedJson) {\n    if (json.object === 'list' && json.data && Array.isArray(json.data)) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: object=list 형식');\n    } else if (json.data && Array.isArray(json.data) && json.data[0]?.embedding) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: data[0].embedding 형식');\n    } else if (json.object && json.data && json.model && json.usage) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: OpenAI Embedding API 응답 형식');\n    }\n  }\n  // Merge된 한 아이템에 AI+Embedding 둘 다 있을 수 있으므로, embedJson 설정 후에도 aiJson 확인 계속\n  \n  // AI Analysis 노드 출력 확인 (Merge된 한 아이템에 index,message,object,data 등이 함께 있을 수 있음)\n  if (!aiJson) {\n    if (json && typeof json === 'object' && json.message && typeof json.message === 'string') {\n      aiJson = { message: { content: json.message } };\n      continue;\n    }\n    if (json && typeof json === 'object' && json.message && json.message.content) {\n      aiJson = json;\n      continue;\n    }\n    // n8n OpenAI 노드가 choices를 반환하는 경우\n    if (json && typeof json === 'object' && json.choices && Array.isArray(json.choices)) {\n      aiJson = json;\n      continue;\n    }\n    // 배열 형식: [{ index: 0, message: { content: '...' } }]\n    if (Array.isArray(json) && json.length > 0) {\n      const firstItem = json[0];\n      if (firstItem && firstItem.message && firstItem.message.content) {\n        aiJson = json;\n        continue;\n      }\n      // n8n이 배열의 첫 번째 항목에 직접 content를 넣는 경우\n      if (firstItem && typeof firstItem === 'object' && firstItem.content) {\n        aiJson = [{ message: { content: firstItem.content } }];\n        continue;\n      }\n    }\n    // 단일 객체에 message.content가 있는 경우\n    if (json && json.message && json.message.content) {\n      aiJson = json;\n      continue;\n    }\n    // n8n이 직접 content 필드를 반환하는 경우\n    if (json && typeof json === 'object' && json.content && typeof json.content === 'string') {\n      aiJson = { message: { content: json.content } };\n      continue;\n    }\n  }\n}\n\n// 3. AI 응답에서 content 추출\nlet aiText = '';\n\nif (aiJson) {\n  // n8n이 직접 message 문자열을 반환하는 경우\n  if (aiJson.message && typeof aiJson.message === 'string') {\n    aiText = aiJson.message;\n  }\n  // 배열 형식: [{ index: 0, message: { content: '...' } }]\n  else if (Array.isArray(aiJson) && aiJson.length > 0) {\n    const firstItem = aiJson[0];\n    if (firstItem && firstItem.message) {\n      if (typeof firstItem.message === 'string') {\n        aiText = firstItem.message;\n      } else if (firstItem.message.content) {\n        aiText = firstItem.message.content;\n      }\n    } else if (firstItem && firstItem.content) {\n      aiText = firstItem.content;\n    }\n  }\n  // choices 형식: { choices: [{ message: { content: '...' } }] }\n  else if (aiJson && typeof aiJson === 'object') {\n    if (aiJson.choices && Array.isArray(aiJson.choices) && aiJson.choices.length > 0) {\n      const choice = aiJson.choices[0];\n      if (choice && choice.message) {\n        if (typeof choice.message === 'string') {\n          aiText = choice.message;\n        } else if (choice.message.content) {\n          aiText = choice.message.content;\n        }\n      }\n    } else if (aiJson.message) {\n      if (typeof aiJson.message === 'string') {\n        aiText = aiJson.message;\n      } else if (aiJson.message.content) {\n        aiText = aiJson.message.content;\n      }\n    } else if (aiJson.content) {\n      aiText = aiJson.content;\n    }\n  }\n}\n\n// AI 응답이 없으면 에러\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로,\n// embedding만 있는 경우에는 이 실행을 건너뛰고 다음 실행을 기다립니다\nif (!aiText || aiText.trim().length === 0) {\n  const debugInfo = allData.map((item, idx) => {\n    const json = item?.json || item;\n    const type = Array.isArray(json) ? 'array' : typeof json;\n    const keys = json && typeof json === 'object' ? Object.keys(json).slice(0, 10) : [];\n    const sample = json && typeof json === 'object' ? JSON.stringify(json).substring(0, 200) : String(json).substring(0, 200);\n    return `입력[${idx}]: 타입=${type}, 키=${keys.join(',')}, 샘플=${sample}`;\n  }).join('; ');\n  \n  // embedding만 있는 경우: 명확한 에러 메시지 제공\n  // n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로, 두 입력이 모두 있을 때만 처리해야 합니다\n  if (embedJson) {\n    // embedding만 있는 경우: 명확한 해결 방법 안내\n    console.log('경고: Embedding 데이터만 받았습니다. AI 응답이 없습니다.');\n    console.log('해결 방법: n8n UI에서 AI Analysis - Extract Data와 HTTP Request 노드 사이에 Merge 노드를 추가하고 Mode를 Combine으로 설정하세요.');\n    throw new Error('AI 응답을 찾을 수 없습니다. Embedding 데이터만 받았습니다. 두 입력(AI Analysis와 Embedding)이 모두 필요합니다. n8n UI에서 Merge 노드를 추가하고 Mode를 Combine으로 설정하세요. 입력 개수: ' + allData.length + '. ' + debugInfo);\n  } else {\n    throw new Error('AI 응답을 찾을 수 없습니다. 입력 개수: ' + allData.length + '. ' + debugInfo);\n  }\n}\n\n// 3. 마크다운 코드 블록 제거 및 JSON 파싱\nlet parsed = {};\ntry {\n  // ```json과 ``` 제거\n  let cleanJson = aiText;\n  if (cleanJson.includes('```json')) {\n    cleanJson = cleanJson.split('```json')[1] || cleanJson;\n  }\n  if (cleanJson.includes('```')) {\n    cleanJson = cleanJson.split('```')[0] || cleanJson;\n  }\n  cleanJson = cleanJson.trim();\n  \n  parsed = JSON.parse(cleanJson);\n} catch (e) {\n  throw new Error('JSON 파싱 실패: ' + e.message);\n}\n\n// 4. 배열 포맷 (PostgreSQL text[] 형식)\nfunction formatPostgresArray(arr) {\n  if (!arr || !Array.isArray(arr) || arr.length === 0) return null;\n  const escaped = arr.map(item => {\n    let str = String(item);\n    let result = '';\n    for (let i = 0; i < str.length; i++) {\n      const char = str[i];\n      if (char === '\"') {\n        result += '\\\\\"';\n      } else if (char === '\\\\') {\n        result += '\\\\\\\\';\n      } else {\n        result += char;\n      }\n    }\n    return result;\n  });\n  return '{' + escaped.join(',') + '}';\n}\n\n// 5. 새 스키마 필드 추출 (한글 키 폴백)\nconst allowedJobGrade = ['사원', '대리', '과장', '차장', '부장', '실장', '이사'];\nconst allowedEducation = ['고졸', '전문학사', '학사', '석사', '박사'];\nconst allowedPositionRole = ['기획자', '디자이너', '퍼블리셔', '프론트엔드개발자', '백엔드개발자'];\n\nconst name_ko = String(parsed.name_ko || parsed.name || parsed.이름 || '').trim() || 'Unknown';\nconst name_en = (parsed.name_en || parsed.name_en_roman || '').trim() || null;\nconst email = String(parsed.email || parsed.이메일 || '').trim() || 'unknown@profile.local';\nconst phone = (parsed.phone || parsed.전화번호 || '').trim() || null;\n\nlet job_grade = (parsed.job_grade || parsed.직급 || '').trim() || null;\nif (job_grade && !allowedJobGrade.includes(job_grade)) job_grade = null;\n\nconst team = (parsed.team || parsed.소속팀 || '').trim() || null;\n\nconst education_school = (parsed.education_school || parsed.학교명 || parsed.school || '').trim() || null;\n\nlet education = (parsed.education || parsed.최종학력 || '').trim() || null;\nif (education && !allowedEducation.includes(education)) education = null;\n\nlet position_role = (parsed.position_role || parsed.직무 || parsed.position || '').trim() || null;\nif (position_role && !allowedPositionRole.includes(position_role)) {\n  const roleMap = { '기획': '기획자', '디자인': '디자이너', '퍼블리싱': '퍼블리셔', '프론트엔드': '프론트엔드개발자', '백엔드': '백엔드개발자' };\n  position_role = roleMap[position_role] || null;\n}\n\nlet industry_experience = parsed.industries || parsed.industry_experience || parsed.산업군 || [];\nif (!Array.isArray(industry_experience)) industry_experience = industry_experience ? [industry_experience] : [];\nconst industryFormatted = industry_experience.length > 0 ? formatPostgresArray(industry_experience) : null;\n\nlet skillsFormatted = null;\nif (parsed.skills && Array.isArray(parsed.skills) && parsed.skills.length > 0) {\n  skillsFormatted = formatPostgresArray(parsed.skills);\n}\n\nconst career_description = (parsed.project_experience || parsed.career_description || parsed.description || parsed.상세설명 || '').trim() || null;\n\nlet professional_business_history = parsed.professional_business_history || parsed.재직이력 || [];\nif (!Array.isArray(professional_business_history)) professional_business_history = [];\nprofessional_business_history = professional_business_history.map((e) => ({\n  project_name: '',\n  industry: String(e.industry || e.company || e.회사 || e.회사명 || '').trim(),\n  duration: ''\n})).filter((e) => e.industry);\nlet project_careers = parsed.project_careers || parsed.프로젝트경력 || [];\nif (!Array.isArray(project_careers)) project_careers = [];\nproject_careers = project_careers.map((p) => (typeof p === 'string' ? p : (p.project_name || p.name || '')).trim()).filter(Boolean);\n\n// 6. embedding 처리 (pgvector 형식으로 변환)\nlet embeddingArray = null;\nif (embedJson) {\n  if (embedJson.data && Array.isArray(embedJson.data) && embedJson.data.length > 0) {\n    const embeddingData = embedJson.data[0];\n    if (embeddingData && Array.isArray(embeddingData.embedding)) {\n      embeddingArray = embeddingData.embedding;\n    }\n  }\n}\n\nif (name_ko === 'Unknown' || email === 'unknown@profile.local') {\n  console.log('일부 필드가 추출되지 않아 기본값으로 저장합니다. name_ko:', name_ko, 'email:', email);\n}\n\nreturn {\n  json: {\n    name_ko: name_ko,\n    name_en: name_en,\n    email: email,\n    phone: phone,\n    job_grade: job_grade,\n    team: team,\n    education_school: education_school,\n    education: education,\n    position_role: position_role,\n    industry_experience: industryFormatted,\n    skills: skillsFormatted,\n    career_description: career_description,\n    embedding: embeddingArray && embeddingArray.length > 0 ? '[' + embeddingArray.join(',') + ']' : null,\n    match_score: 0,\n    professional_business_history: professional_business_history,\n    project_careers: project_careers\n  }\n};"
+        "jsCode": "// 1. 입력 데이터 가져오기\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리될 수 있으므로,\n// 실행 컨텍스트를 활용하여 두 입력을 모두 받도록 처리\nconst allData = $input.all();\n\n// 디버그: 입력 개수 확인\nconsole.log('Prepare Supabase Data - 입력 개수:', allData.length);\nconsole.log('Prepare Supabase Data - 실행 ID:', $execution.id);\n\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로,\n// 두 입력이 모두 있는지 확인하고, 하나만 있으면 에러 발생\n// (실제로는 n8n이 자동으로 두 입력을 합쳐주지만, 확인용)\nif (allData.length < 2) {\n  console.log('경고: 입력이 2개 미만입니다. 병렬 실행이 완료되지 않았을 수 있습니다.');\n  console.log('입력 데이터:', JSON.stringify(allData.map(item => ({ keys: Object.keys(item?.json || {}).slice(0, 5) }))));\n}\n\n// 2. 입력 데이터 자동 판단 (순서에 상관없이)\nlet aiJson = null;\nlet embedJson = null;\n\nfor (let i = 0; i < allData.length; i++) {\n  const item = allData[i];\n  const json = item?.json || item;\n  \n  if (!json) continue;\n  \n  // 디버그: 각 입력의 키 확인\n  if (json && typeof json === 'object') {\n    const keys = Object.keys(json).slice(0, 10);\n    console.log(`입력[${i}] 키:`, keys.join(', '));\n  }\n  \n  // Merge 노드에서 합쳐진 데이터 확인\n  if (json.aiResponse) {\n    aiJson = json.aiResponse;\n    console.log('AI 응답 데이터 발견: aiResponse 필드');\n  }\n  if (json.embeddingResponse) {\n    embedJson = json.embeddingResponse;\n    console.log('Embedding 응답 데이터 발견: embeddingResponse 필드');\n  }\n  \n  // Embedding 데이터 확인 (먼저 확인 - object: 'list' 형식)\n  if (!embedJson) {\n    if (json.object === 'list' && json.data && Array.isArray(json.data)) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: object=list 형식');\n    } else if (json.data && Array.isArray(json.data) && json.data[0]?.embedding) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: data[0].embedding 형식');\n    } else if (json.object && json.data && json.model && json.usage) {\n      embedJson = json;\n      console.log('Embedding 데이터 발견: OpenAI Embedding API 응답 형식');\n    }\n  }\n  // Merge된 한 아이템에 AI+Embedding 둘 다 있을 수 있으므로, embedJson 설정 후에도 aiJson 확인 계속\n  \n  // AI Analysis 노드 출력 확인 (Merge된 한 아이템에 index,message,object,data 등이 함께 있을 수 있음)\n  if (!aiJson) {\n    if (json && typeof json === 'object' && json.message && typeof json.message === 'string') {\n      aiJson = { message: { content: json.message } };\n      continue;\n    }\n    if (json && typeof json === 'object' && json.message && json.message.content) {\n      aiJson = json;\n      continue;\n    }\n    // n8n OpenAI 노드가 choices를 반환하는 경우\n    if (json && typeof json === 'object' && json.choices && Array.isArray(json.choices)) {\n      aiJson = json;\n      continue;\n    }\n    // 배열 형식: [{ index: 0, message: { content: '...' } }]\n    if (Array.isArray(json) && json.length > 0) {\n      const firstItem = json[0];\n      if (firstItem && firstItem.message && firstItem.message.content) {\n        aiJson = json;\n        continue;\n      }\n      // n8n이 배열의 첫 번째 항목에 직접 content를 넣는 경우\n      if (firstItem && typeof firstItem === 'object' && firstItem.content) {\n        aiJson = [{ message: { content: firstItem.content } }];\n        continue;\n      }\n    }\n    // 단일 객체에 message.content가 있는 경우\n    if (json && json.message && json.message.content) {\n      aiJson = json;\n      continue;\n    }\n    // n8n이 직접 content 필드를 반환하는 경우\n    if (json && typeof json === 'object' && json.content && typeof json.content === 'string') {\n      aiJson = { message: { content: json.content } };\n      continue;\n    }\n  }\n}\n\n// 3. AI 응답에서 content 추출\nlet aiText = '';\n\nif (aiJson) {\n  // n8n이 직접 message 문자열을 반환하는 경우\n  if (aiJson.message && typeof aiJson.message === 'string') {\n    aiText = aiJson.message;\n  }\n  // 배열 형식: [{ index: 0, message: { content: '...' } }]\n  else if (Array.isArray(aiJson) && aiJson.length > 0) {\n    const firstItem = aiJson[0];\n    if (firstItem && firstItem.message) {\n      if (typeof firstItem.message === 'string') {\n        aiText = firstItem.message;\n      } else if (firstItem.message.content) {\n        aiText = firstItem.message.content;\n      }\n    } else if (firstItem && firstItem.content) {\n      aiText = firstItem.content;\n    }\n  }\n  // choices 형식: { choices: [{ message: { content: '...' } }] }\n  else if (aiJson && typeof aiJson === 'object') {\n    if (aiJson.choices && Array.isArray(aiJson.choices) && aiJson.choices.length > 0) {\n      const choice = aiJson.choices[0];\n      if (choice && choice.message) {\n        if (typeof choice.message === 'string') {\n          aiText = choice.message;\n        } else if (choice.message.content) {\n          aiText = choice.message.content;\n        }\n      }\n    } else if (aiJson.message) {\n      if (typeof aiJson.message === 'string') {\n        aiText = aiJson.message;\n      } else if (aiJson.message.content) {\n        aiText = aiJson.message.content;\n      }\n    } else if (aiJson.content) {\n      aiText = aiJson.content;\n    }\n  }\n}\n\n// AI 응답이 없으면 에러\n// n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로,\n// embedding만 있는 경우에는 이 실행을 건너뛰고 다음 실행을 기다립니다\nif (!aiText || aiText.trim().length === 0) {\n  const debugInfo = allData.map((item, idx) => {\n    const json = item?.json || item;\n    const type = Array.isArray(json) ? 'array' : typeof json;\n    const keys = json && typeof json === 'object' ? Object.keys(json).slice(0, 10) : [];\n    const sample = json && typeof json === 'object' ? JSON.stringify(json).substring(0, 200) : String(json).substring(0, 200);\n    return `입력[${idx}]: 타입=${type}, 키=${keys.join(',')}, 샘플=${sample}`;\n  }).join('; ');\n  \n  // embedding만 있는 경우: 명확한 에러 메시지 제공\n  // n8n에서 병렬 실행 시 각각 별도 실행으로 처리되므로, 두 입력이 모두 있을 때만 처리해야 합니다\n  if (embedJson) {\n    // embedding만 있는 경우: 명확한 해결 방법 안내\n    console.log('경고: Embedding 데이터만 받았습니다. AI 응답이 없습니다.');\n    console.log('해결 방법: n8n UI에서 AI Analysis - Extract Data와 HTTP Request 노드 사이에 Merge 노드를 추가하고 Mode를 Combine으로 설정하세요.');\n    throw new Error('AI 응답을 찾을 수 없습니다. Embedding 데이터만 받았습니다. 두 입력(AI Analysis와 Embedding)이 모두 필요합니다. n8n UI에서 Merge 노드를 추가하고 Mode를 Combine으로 설정하세요. 입력 개수: ' + allData.length + '. ' + debugInfo);\n  } else {\n    throw new Error('AI 응답을 찾을 수 없습니다. 입력 개수: ' + allData.length + '. ' + debugInfo);\n  }\n}\n\n// 3. 마크다운 코드 블록 제거 및 JSON 파싱\nlet parsed = {};\ntry {\n  // ```json과 ``` 제거\n  let cleanJson = aiText;\n  if (cleanJson.includes('```json')) {\n    cleanJson = cleanJson.split('```json')[1] || cleanJson;\n  }\n  if (cleanJson.includes('```')) {\n    cleanJson = cleanJson.split('```')[0] || cleanJson;\n  }\n  cleanJson = cleanJson.trim();\n  \n  parsed = JSON.parse(cleanJson);\n} catch (e) {\n  throw new Error('JSON 파싱 실패: ' + e.message);\n}\n\n// 4. 배열 포맷 (PostgreSQL text[] 형식)\nfunction formatPostgresArray(arr) {\n  if (!arr || !Array.isArray(arr) || arr.length === 0) return null;\n  const escaped = arr.map(item => {\n    let str = String(item);\n    let result = '';\n    for (let i = 0; i < str.length; i++) {\n      const char = str[i];\n      if (char === '\"') {\n        result += '\\\\\"';\n      } else if (char === '\\\\') {\n        result += '\\\\\\\\';\n      } else {\n        result += char;\n      }\n    }\n    return result;\n  });\n  return '{' + escaped.join(',') + '}';\n}\n\n// 5. 새 스키마 필드 추출 (한글 키 폴백)\nconst allowedJobGrade = ['사원', '대리', '과장', '차장', '부장', '실장', '이사'];\nconst allowedEducation = ['고졸', '전문학사', '학사', '석사', '박사'];\nconst allowedPositionRole = ['기획자', '디자이너', '퍼블리셔', '프론트엔드개발자', '백엔드개발자'];\n\nconst name_ko = String(parsed.name_ko || parsed.name || parsed.이름 || '').trim() || 'Unknown';\nconst name_en = (parsed.name_en || parsed.name_en_roman || '').trim() || null;\nconst email = String(parsed.email || parsed.이메일 || '').trim() || 'unknown@profile.local';\nconst phone = (parsed.phone || parsed.전화번호 || '').trim() || null;\n\nlet job_grade = (parsed.job_grade || parsed.직급 || '').trim() || null;\nif (job_grade && !allowedJobGrade.includes(job_grade)) job_grade = null;\n\nconst team = (parsed.team || parsed.소속팀 || '').trim() || null;\n\nconst education_school = (parsed.education_school || parsed.학교명 || parsed.school || '').trim() || null;\n\nlet education = (parsed.education || parsed.최종학력 || '').trim() || null;\nif (education && !allowedEducation.includes(education)) education = null;\n\nlet position_role = (parsed.position_role || parsed.직무 || parsed.position || '').trim() || null;\nif (position_role && !allowedPositionRole.includes(position_role)) {\n  const roleMap = { '기획': '기획자', '디자인': '디자이너', '퍼블리싱': '퍼블리셔', '프론트엔드': '프론트엔드개발자', '백엔드': '백엔드개발자' };\n  position_role = roleMap[position_role] || null;\n}\n\nlet industry_experience = parsed.industries || parsed.industry_experience || parsed.산업군 || [];\nif (!Array.isArray(industry_experience)) industry_experience = industry_experience ? [industry_experience] : [];\nconst industryFormatted = industry_experience.length > 0 ? formatPostgresArray(industry_experience) : null;\n\nlet skillsFormatted = null;\nif (parsed.skills && Array.isArray(parsed.skills) && parsed.skills.length > 0) {\n  skillsFormatted = formatPostgresArray(parsed.skills);\n}\n\nconst career_description = (parsed.project_experience || parsed.career_description || parsed.description || parsed.상세설명 || '').trim() || null;\n\nlet professional_business_history = parsed.professional_business_history || parsed.재직이력 || [];\nif (!Array.isArray(professional_business_history)) professional_business_history = [];\nprofessional_business_history = professional_business_history.map((e) => ({\n  project_name: '',\n  industry: String(e.industry || e.company || e.회사 || e.회사명 || '').trim(),\n  duration: ''\n})).filter((e) => e.industry);\nlet project_careers = parsed.project_careers || parsed.프로젝트경력 || [];\nif (!Array.isArray(project_careers)) project_careers = [];\nproject_careers = project_careers.map((p) => (typeof p === 'string' ? p : (p.project_name || p.name || '')).trim()).filter(Boolean);\n\n// 6. embedding 처리 (pgvector 형식으로 변환)\nlet embeddingArray = null;\nif (embedJson) {\n  if (embedJson.data && Array.isArray(embedJson.data) && embedJson.data.length > 0) {\n    const embeddingData = embedJson.data[0];\n    if (embeddingData && Array.isArray(embeddingData.embedding)) {\n      embeddingArray = embeddingData.embedding;\n    }\n  }\n}\n\nif (name_ko === 'Unknown' || email === 'unknown@profile.local') {\n  console.log('일부 필드가 추출되지 않아 기본값으로 저장합니다. name_ko:', name_ko, 'email:', email);\n}\n\n// 7. Merge With Photo에서 넘어온 photo_url 추출\nlet photoUrl = null;\nfor (let i = 0; i < allData.length; i++) {\n  const j = allData[i]?.json || allData[i];\n  if (j && j.photo_url != null && j.photo_url !== '') {\n    photoUrl = j.photo_url;\n    break;\n  }\n}\n\nreturn {\n  json: {\n    name_ko: name_ko,\n    name_en: name_en,\n    email: email,\n    phone: phone,\n    job_grade: job_grade,\n    team: team,\n    education_school: education_school,\n    education: education,\n    position_role: position_role,\n    industry_experience: industryFormatted,\n    skills: skillsFormatted,\n    career_description: career_description,\n    embedding: embeddingArray && embeddingArray.length > 0 ? '[' + embeddingArray.join(',') + ']' : null,\n    match_score: 0,\n    professional_business_history: professional_business_history,\n    project_careers: project_careers,\n    photo_url: photoUrl\n  }\n};"
       },
       "id": "c1cb9524-07e4-4b92-b7bb-a075391ff826",
       "name": "Prepare Supabase Data",
@@ -273,6 +342,10 @@
             {
               "fieldId": "embedding",
               "fieldValue": "={{ $json.embedding }}"
+            },
+            {
+              "fieldId": "photo_url",
+              "fieldValue": "={{ $json.photo_url || null }}"
             }
           ]
         }
@@ -486,6 +559,17 @@
         10260,
         2896
       ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition"
+      },
+      "id": "merge-with-photo-001",
+      "name": "Merge With Photo",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 2,
+      "position": [10380, 2896]
     }
   ],
   "pinData": {},
@@ -535,6 +619,33 @@
             "node": "HTTP Request",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Upload Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Image": {
+      "main": [
+        [
+          {
+            "node": "Normalize Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Upload": {
+      "main": [
+        [
+          {
+            "node": "Merge With Photo",
+            "type": "main",
+            "index": 1
           }
         ]
       ]
@@ -551,6 +662,17 @@
       ]
     },
     "Merge AI and Embedding": {
+      "main": [
+        [
+          {
+            "node": "Merge With Photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge With Photo": {
       "main": [
         [
           {

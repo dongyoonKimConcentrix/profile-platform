@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Clock } from "lucide-react";
 import Link from "next/link";
@@ -62,7 +62,10 @@ export function RecentUpdates({ recentProfiles }: RecentUpdatesProps) {
               aria-label={`${profile.name_ko} 프로필 보기`}
             >
               <div className="flex items-start gap-4">
-                <Avatar>
+                <Avatar className="h-12 w-12 shrink-0">
+                  {profile.photo_url && (
+                    <AvatarImage src={profile.photo_url} alt="" className="object-cover" />
+                  )}
                   <AvatarFallback>
                     {profile.name_ko.charAt(0)}
                   </AvatarFallback>
